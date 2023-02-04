@@ -1,0 +1,198 @@
+#This program takes data of longtitude and latitude from the csv file and plots the points on google earth.
+
+import simplekml #the library used to map longitudes and latitudes on google earth
+import pandas #used to read spreadsheet data
+import re
+import operator
+import streamlit as st
+import chardet
+import os
+from polycircles import polycircles
+
+
+#Custom button color to bring prominence to executable actions
+st.set_page_config(
+    menu_items={}
+)
+
+m = st.markdown("""
+        <style>
+        div.stButton > button:first-child {
+            background-color: #ff0000;
+            color:#ffffff;
+        }
+        div.stButton > button:hover {
+            background-color: #8b0000;
+            color:#ff0000;
+            }
+        </style>""", unsafe_allow_html=True)
+#This removes Streamlit default settings icons
+hide_streamlit_style = """
+            <style>
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
+            </style>
+            """
+st.markdown(hide_streamlit_style, unsafe_allow_html=True) 
+
+
+### Global Variables ###
+# out_file = '/Users/nlc/Desktop/test/mappy.kml'
+get_headings = ""
+selected_encoding = ""
+icon_options = ["Yellow Paddle", "Green Paddle", "Blue Paddle", "White Paddle", "Teal Paddle", "Red Paddle", "Yellow Pushpin", "White Pushpin", "Red Pushpin", "Square"]
+selected_icon = {'Square' :'http://maps.google.com/mapfiles/kml/shapes/placemark_square.png','Yellow Pushpin' : "http://maps.google.com/mapfiles/kml/pushpin/ylw-pushpin.png",'Red Pushpin' : "http://maps.google.com/mapfiles/kml/pushpin/red-pushpin.png",'White Pushpin' : "http://maps.google.com/mapfiles/kml/pushpin/wht-pushpin.png",'Red Paddle' : "http://maps.google.com/mapfiles/kml/paddle/red-circle.png",'Green Paddle' : "http://maps.google.com/mapfiles/kml/paddle/grn-circle.png",'Blue Paddle' : "http://maps.google.com/mapfiles/kml/paddle/blu-circle.png",'Teal Paddle' : "http://maps.google.com/mapfiles/kml/paddle/ltblu-circle.png",'Yellow Paddle' : "http://maps.google.com/mapfiles/kml/paddle/ylw-circle.png",'White Paddle' : "http://maps.google.com/mapfiles/kml/paddle/wht-circle.png"}
+
+####    Functions Live Here     ######
+
+def KML_output_file(name_for_file):
+    name_for_file = name_for_file + ".kml"
+    out_folder = os.path.expanduser('~\\Documents\\Locus_Maps\\')
+    if os.path.exists(out_folder) == False:
+        os.makedirs(out_folder)
+    else:
+        pass
+    out_file = os.path.expanduser(out_folder+name_for_file)
+    return out_file
+
+def convert_hex6_to_hex8_color(hex6):
+    #   This function converts hex 6 colors to hex 8
+    hex6 = list(hex6.strip("#"))  # convert string to list and remove #
+    color_hex_order = [5,4,3,2,1,0] # reorders hex 6 basically  it flips it
+    hex6 = "#00" + "".join([hex6[i] for i in color_hex_order])  # to change opacity alter "00" value at front
+    return hex6
+
+def get_file_encoding(infile):
+    return (chardet.detect(infile.read()))
+
+
+def preview_csv(infile, outfile):       #   This facilitates the onscreen preview and KML creation
+    try:
+        dataf = pandas.read_csv(infile, encoding=selected_encoding)
+    # dataf = dataf.applymap(lambda s: s.upper() if type(s) == str else s) #makes the frame uppercase
+        n = lines_t0_remove
+        if n > 0:
+            dataf.columns = dataf.iloc[n-1]   
+        dataf.columns = dataf.columns.str.upper()
+ 
+        dataf = dataf[0:]
+        dataf = dataf.iloc[n:]
+        first_five_lines = dataf.head(6)
+        first_five_lines = first_five_lines.loc[:,~first_five_lines.columns.duplicated()]
+        # style_table = first_five_lines.style.hide_index()
+        st.dataframe(data=first_five_lines, use_container_width=True)
+        headers = dataf.columns.to_list()
+        # print(headers)
+        st.sidebar.subheader("Assign Column Headers")
+        label_for_icons = st.sidebar.selectbox("Map Point Labels", options=headers)
+        # print(label_for_icons)
+        point_description = st.sidebar.selectbox("Additional Descriptions", options=headers)
+        if footprint == True:
+            radii = st.sidebar.selectbox("Radius/Distance-from-Point in Meters", options=headers)
+        # print(point_description)
+        
+        if KML == True:
+            if len(filename) == 0:
+                with notices:
+                    st.error("Map Name Required")
+            if len(filename) > 0:
+                kml = simplekml.Kml()
+                Descript = point_description
+                Label = label_for_icons
+                
+                # try:
+                if footprint == True: 
+                    for lon, lat, lab, desc, rad in zip(dataf["LONGITUDE"], dataf["LATITUDE"], dataf[Label], dataf[Descript], dataf[radii]):  #zip with for 
+                
+                        lo_search = re.findall(r'([0-9.-]+).+?([0-9.-]+)', str(lon))    #regex to find what appears to be longitude, makes tuple, only provides first result of tuple
+                        first_result_lo = map(operator.itemgetter(0), lo_search)
+                        for i in first_result_lo:
+                            long = i
+
+                        la_search = re.findall(r'([0-9.-]+).+?([0-9.-]+)', str(lat))
+                        first_result_la = map(operator.itemgetter(0), la_search)
+                        for f in first_result_la:
+                            lati = f
+
+                        point = kml.newpoint(name=lab, coords= [(long, lati)], description=desc) #15(lon),15(lat) are geological coordinates of the location.     
+                        point.style.iconstyle.icon.href = selected_icon[icon]
+                        if footprint == True:
+                            try:
+                                polycircle = polycircles.Polycircle(latitude=float(lati),
+                                                longitude=float(long),
+                                                radius=float(rad),
+                                                number_of_vertices=72)
+
+                                pol = kml.newpolygon(name=(str(lati) + ', ' + str(long) + ', ' + str(rad)), outerboundaryis=polycircle.to_kml())
+                                pol.style.polystyle.color = \
+                                    simplekml.Color.changealphaint(200, simplekml.Color.yellow)
+                            except ValueError:
+                                with notices:
+                                    st.error("Value Error - Inspect Latitude, Longitude, and Radius Columns")
+                if footprint == False: 
+                    for lon, lat, lab, desc in zip(dataf["LONGITUDE"], dataf["LATITUDE"], dataf[Label], dataf[Descript]):  #zip with for 
+
+                        lo_search = re.findall(r'([0-9.-]+).+?([0-9.-]+)', str(lon))    #regex to find what appears to be longitude, makes tuple, only provides first result of tuple
+                        first_result_lo = map(operator.itemgetter(0), lo_search)
+                        for i in first_result_lo:
+                            long = i
+
+                        la_search = re.findall(r'([0-9.-]+).+?([0-9.-]+)', str(lat))
+                        first_result_la = map(operator.itemgetter(0), la_search)
+                        for f in first_result_la:
+                            lati = f
+
+                        point = kml.newpoint(name=lab, coords= [(long, lati)], description=desc) #15(lon),15(lat) are geological coordinates of the location.     
+                        point.style.iconstyle.icon.href = selected_icon[icon]
+            # except KeyError:
+            #     print("There was a keyerror")
+
+                kml.save(outfile) # To save kml file to use in google earth use:
+                with notices:
+                    st.success("KML file has been stored to: " + outfile)
+        return headers, dataf 
+    except UnicodeError:
+        st.error("Decoding error. Try another encoding method.")
+        pass 
+
+st.sidebar.markdown("<h1 style='text-align: left; font-family: impact; font-size: 77px; color: red;'>  LOCUS</h1>", unsafe_allow_html=True)
+st.sidebar.write("CSV to KML Geoloaction Tool")
+st.sidebar.markdown("---")
+
+####    Main Page   ####
+notices = st.empty()
+filename = st.text_input("Provide Map Name*  (.kml will be added automatically)")
+uploaded_file = st.file_uploader("Choose a CSV file", type=["csv"])
+
+with st.expander("Manage CSV File"):
+    lines_t0_remove = st.slider(label="Number of Rows to Remove from Start of Table      (First line must include 'Latitude' and 'Longitude')", min_value=0, max_value=10)
+    
+    if uploaded_file != None:
+        
+        #####   Sidebar settings    #####
+        
+        icon = st.sidebar.selectbox("Select Map Point Icon Style", options=icon_options)
+        footprint = st.sidebar.checkbox("Dataset includes radius/area information",)
+
+        suggested_encoding = get_file_encoding(uploaded_file)
+        
+        encode_options = st.radio(label="Encoding Options", options=["Use Suggested Encoding: " + str(suggested_encoding['encoding']), "Use Manual Encoding Selection"])
+        if encode_options == "Use Suggested Encoding: " + str(suggested_encoding['encoding']):
+            selected_encoding = suggested_encoding['encoding']
+        if encode_options == "Use Manual Encoding Selection":       
+            selected_encoding = st.selectbox("Choose File Encoding",options=["utf-8", 'utf-8-sig', 'utf-16', 'ISO-8859-1'])
+     
+        uploaded_file.seek(0)
+        
+        KML = st.sidebar.button("GENERATE KML")
+        st.sidebar.markdown("---")
+        
+        outFile = KML_output_file(filename)
+        print(outFile)
+        get_headings, preview_data = preview_csv(uploaded_file, outfile=outFile)
+       
+if uploaded_file != None:
+    try:
+        st.map(preview_data)
+    except Exception:
+        st.info("Map preview not available with currently selected data. Select Manage CSV File to adjust your data. Column headers must have Latitude and Longitude.")
