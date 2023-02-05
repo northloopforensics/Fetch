@@ -17,7 +17,7 @@ A tool to convert Latitude and Longitude values found in a CSV document into a G
 
 ![alt text](https://user-images.githubusercontent.com/73806121/216791321-4c756cf3-b02a-4e6b-9a94-235080c0d10b.png)
 
-5.  If the CSV is correctly configured you will see a preview map. If not, the collapsable Managae CSV window allows you to select the number of header lines to remove from the CSV.  **The CSV file MUST contain columns labeled "Latitude" and "Longitude".**  The lack of a preview map does **NOT** mean KML is unable to be produced.
+5.  If the CSV is correctly configured you will see a preview map. If not, the collapsable Manage CSV window allows you to select the number of header lines to remove from the CSV.  **The CSV file MUST contain columns labeled "Latitude" and "Longitude".**  The lack of a preview map does **NOT** mean KML is unable to be produced.
 
 ![alt text](https://user-images.githubusercontent.com/73806121/216791634-5de2c0d1-ed32-45c0-806f-575f744e80d8.png)
 
