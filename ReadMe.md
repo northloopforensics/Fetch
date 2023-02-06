@@ -33,6 +33,8 @@ A tool to convert Latitude and Longitude values found in a CSV document into a G
 
 ![alt text](https://user-images.githubusercontent.com/73806121/216791917-9dc39e53-e0ef-4ff2-9ef1-1fb4458e17d7.png)
 
+Below image is Google Earth output.
+
 ![alt text](https://user-images.githubusercontent.com/73806121/216791825-56539e9d-67fc-483c-b8b7-1052e5805f0b.png)
 
 
