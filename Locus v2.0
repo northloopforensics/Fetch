@@ -11,7 +11,13 @@ from polycircles import polycircles
 
 
 #Custom button color to bring prominence to executable actions
+
 st.set_page_config(
+   page_title="Locus",
+   page_icon="🔴",
+   layout="wide",
+   initial_sidebar_state="expanded",
+
     menu_items={}
 )
 
@@ -44,6 +50,23 @@ icon_options = ["Yellow Paddle", "Green Paddle", "Blue Paddle", "White Paddle", 
 selected_icon = {'Square' :'http://maps.google.com/mapfiles/kml/shapes/placemark_square.png','Yellow Pushpin' : "http://maps.google.com/mapfiles/kml/pushpin/ylw-pushpin.png",'Red Pushpin' : "http://maps.google.com/mapfiles/kml/pushpin/red-pushpin.png",'White Pushpin' : "http://maps.google.com/mapfiles/kml/pushpin/wht-pushpin.png",'Red Paddle' : "http://maps.google.com/mapfiles/kml/paddle/red-circle.png",'Green Paddle' : "http://maps.google.com/mapfiles/kml/paddle/grn-circle.png",'Blue Paddle' : "http://maps.google.com/mapfiles/kml/paddle/blu-circle.png",'Teal Paddle' : "http://maps.google.com/mapfiles/kml/paddle/ltblu-circle.png",'Yellow Paddle' : "http://maps.google.com/mapfiles/kml/paddle/ylw-circle.png",'White Paddle' : "http://maps.google.com/mapfiles/kml/paddle/wht-circle.png"}
 
 ####    Functions Live Here     ######
+
+def get_footprint_color(icon_Color):
+    if "Yellow" in icon_Color:
+        footprint_color = simplekml.Color.changealphaint(50, simplekml.Color.yellow)
+    if "Red" in icon_Color:
+        footprint_color = simplekml.Color.changealphaint(100, simplekml.Color.red)
+    if "Blue" in icon_Color:
+        footprint_color = simplekml.Color.changealphaint(100, simplekml.Color.blue)
+    if "White" in icon_Color:
+        footprint_color = simplekml.Color.changealphaint(100, simplekml.Color.white)
+    if "Green" in icon_Color:
+        footprint_color = simplekml.Color.changealphaint(100, simplekml.Color.green)
+    if "Teal" in icon_Color:
+        footprint_color = simplekml.Color.changealphaint(100, simplekml.Color.lightblue)
+    if "Square" in icon_Color:
+        footprint_color = simplekml.Color.changealphaint(200, simplekml.Color.white)
+    return footprint_color
 
 def KML_output_file(name_for_file):
     name_for_file = name_for_file + ".kml"
@@ -102,6 +125,7 @@ def preview_csv(infile, outfile):       #   This facilitates the onscreen previe
                 
                 # try:
                 if footprint == True: 
+                    footy_color = get_footprint_color(icon_Color=icon)
                     for lon, lat, lab, desc, rad in zip(dataf["LONGITUDE"], dataf["LATITUDE"], dataf[Label], dataf[Descript], dataf[radii]):  #zip with for 
                 
                         lo_search = re.findall(r'([0-9.-]+).+?([0-9.-]+)', str(lon))    #regex to find what appears to be longitude, makes tuple, only provides first result of tuple
@@ -125,7 +149,7 @@ def preview_csv(infile, outfile):       #   This facilitates the onscreen previe
 
                                 pol = kml.newpolygon(name=(str(lati) + ', ' + str(long) + ', ' + str(rad)), outerboundaryis=polycircle.to_kml())
                                 pol.style.polystyle.color = \
-                                    simplekml.Color.changealphaint(200, simplekml.Color.yellow)
+                                    footy_color #changes the radius circle color
                             except ValueError:
                                 with notices:
                                     st.error("Value Error - Inspect Latitude, Longitude, and Radius Columns")
@@ -156,7 +180,7 @@ def preview_csv(infile, outfile):       #   This facilitates the onscreen previe
         pass 
 
 st.sidebar.markdown("<h1 style='text-align: left; font-family: impact; font-size: 77px; color: red;'>  LOCUS</h1>", unsafe_allow_html=True)
-st.sidebar.write("CSV to KML Geoloaction Tool")
+st.sidebar.write("CSV to KML Geolocation Tool")
 st.sidebar.markdown("---")
 
 ####    Main Page   ####
