@@ -2,7 +2,7 @@
 # Place the Streamlit script to be compiled here
 #This program takes data of longtitude and latitude from the csv file and plots the points on google earth.
 
-#   TO DO - routes, filter by time, declutter
+#   TO DO - time slider is not updated when picking dates w calendar, declutter
 
 import simplekml #the library used to map longitudes and latitudes on google earth
 import pandas #used to read spreadsheet data
@@ -14,8 +14,15 @@ import os
 from polycircles import polycircles
 import os
 import leafmap.foliumap as leafmap
+from leafmap.foliumap import plugins
 import geopandas
-
+import folium
+from shapely.wkt import loads
+from math import asin, atan2, cos, degrees, radians, sin
+from folium.plugins import Draw, Geocoder
+from streamlit_folium import st_folium
+import pyperclip
+import datetime
 
 
 #Custom button color to bring prominence to executable actions
@@ -59,50 +66,202 @@ selected_icon = {'Square' :'http://maps.google.com/mapfiles/kml/shapes/placemark
 
 ####    Functions Live Here     ######
 
+def get_point_at_distance(lat1, lon1, d, bearing, R=6371):
+    """
+    lat: initial latitude, in degrees
+    lon: initial longitude, in degrees
+    d: target distance from initial
+    bearing: (true) heading in degrees
+    R: optional radius of sphere, defaults to mean radius of earth
+
+    Returns new lat/lon coordinate {d}km from initial, in degrees
+    """
+    lat1 = radians(lat1)
+    lon1 = radians(lon1)
+    a = radians(bearing)
+    lat2 = asin(sin(lat1) * cos(d/R) + cos(lat1) * sin(d/R) * cos(a))
+    lon2 = lon1 + atan2(
+        sin(a) * sin(d/R) * cos(lat1),
+        cos(d/R) - sin(lat1) * sin(lat2)
+    )
+    return (degrees(lat2), degrees(lon2),)
+
+def make_geofence_map():
+    help_Box = st.expander(label="Help")
+    with help_Box:
+        st.write("""Use the shape elements in the map toolbar to create shapes for the geofence. \n\nOnce your geofence has been drawn, 
+        the coordinates will populate below the map.  \n\nYou can add the coordinates to your clipboard to be pasted elsewhere or you 
+        can save the entire page using your browser.\n\nATTENTION: Verify any addresses or locations presented by using the search bar. 
+        Accuracy varies based on location.""")
+    # sized_geo_map = folium.Figure(width=1000, height=500)
+    geomap = folium.Map()
+    # tile = folium.TileLayer(
+    #         tiles = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    #         attr = 'Esri',
+    #         name = 'Esri Satellite',
+    #         overlay = False,
+    #         control = True
+    #     ).add_to(geomap)
+
+    Draw(export=True,draw_options=({'circle': False,'circlemarker':False, 'marker':False})).add_to(geomap)
+    folium.LayerControl(position="topright", collapsed=False).add_to(geomap)
+    Geocoder(position='bottomleft',add_marker=True).add_to(geomap)
+
+    outputmap = st_folium(geomap, width=1000, height=500)
+       
+    try:        #   pulls the lats and longs from the returned JSON encoded map points
+        parse1 = (outputmap['last_active_drawing'])
+        parse2 = (parse1['geometry'])
+        parse3 = (parse2['coordinates'])
+        st.subheader("Geofence Coordinates")
+        text_of_coords = "Latitude, Longitude\n"
+        for list in parse3:
+            for coord in list:
+                lon, lat = coord[0], coord[1]
+                text_of_coords = text_of_coords + "\n" + (str(lat) + ", " + str(lon)) + "\n"
+        texting = st.write(text_of_coords)
+        copy_dis = st.button("Copy to Clipboard")
+        if copy_dis == True:
+            pyperclip.copy(text_of_coords)
+        
+    except TypeError:
+        # print("no data to populate - add some data")
+        pass
+    
+
 def make_map(in_df):       #bring in pandas dataframe
     gdf = geopandas.GeoDataFrame(in_df, geometry=geopandas.points_from_xy(in_df.LONGITUDE, in_df.LATITUDE))
-    map_Type = st.radio("Select Map Type", options=["Circle Markers", "Clustered Markers", "Heat Map"], horizontal=True)
-
+    
+    map_Type = st.radio("Select Map Type", options=["Circle Markers", "Clustered Markers", "Heat Map", "Cell Sites"], horizontal=True)
     Map = leafmap.Map()
     #Zooms to bounds of the dataframe
     Map.zoom_to_gdf(gdf) 
     # Map.add_xyz_service("mapbox://styles/mapbox/dark-v11")
-    print(leafmap.search_xyz_services(keyword='dark'))
     Map.add_basemap(basemap='OpenStreetMap')
     Map.add_basemap(basemap='ROADMAP')
-    Map.add_basemap(basemap='SATELLITE')
-    Map.add_basemap(basemap='TERRAIN')
+    # Map.add_basemap(basemap='SATELLITE')
+    # Map.add_basemap(basemap='TERRAIN')
     Map.add_basemap(basemap='HYBRID')
     Map.add_basemap(basemap='CartoDB.Positron')
-    Map.add_basemap(basemap="CartoDB.DarkMatter")
-    # jawgDarkMap = "xyz.Jawg.Dark"
-    # jawAPI = "thAPSsp0Vzx3TDkhaHR5Juu77J1Fw6ULZxavl4J7ruJMaCxTDqPFfSexVnIZ71dB"
-    # jawgDarkMap['apiKey'] = os.environ[jawAPI]
-    # Map.add_xyz_service("xyz.Jawg.Dark",)
-    # Map.add_xyz_service('xyz.AzureMaps.MicrosoftBaseDarkGrey')
-    
-
+    Map.add_basemap(basemap="CartoDB.DarkMatter") 
 
     if map_Type == "Clustered Markers":
         grouped_Points = Map.add_points_from_xy(gdf, x="LONGITUDE", y="LATITUDE", min_width=10,max_width=250,layer_name="Clustered Points", add_legend=False)
+    
     if map_Type == "Heat Map":
         in_df.columns = in_df.columns.str.upper()
-        weighted_value_column = st.sidebar.selectbox("For Heat Map - Weighted Value Column", options=in_df.columns)
-       
-        heatmap = Map.add_heatmap(gdf, longitude="LONGITUDE", latitude="LATITUDE",value=weighted_value_column,name="Heat Map", radius=25)
+        weight_type = st.radio("Select Weight Type", options=["Point Density", "Weighted Density"], horizontal=True)
+        if weight_type == "Point Density":
+            set_weight_to_one = gdf.assign(weight_column=1)
+            # print(set_weight_to_one)
+            try:
+                heatmap = Map.add_heatmap(set_weight_to_one, longitude="LONGITUDE", latitude="LATITUDE",value='weight_column',name="Heat Map", radius=25,)
+            except Exception:
+                st.info("Heat Maps use weighted numeric values to accomodate issues like population density. Select column for your dataset.")
+
+        if weight_type == "Weighted Density":
+            weighted_value_column = st.selectbox("Weighted Value Column", options=gdf.columns)
+            try:
+                heatmap = Map.add_heatmap(gdf, longitude="LONGITUDE", latitude="LATITUDE",value=weighted_value_column,name="Heat Map", radius=25,)
+            except Exception:
+                st.info("Heat Maps use weighted numeric values to accomodate issues like population density. Select column for your dataset.")
+
+
     if map_Type == "Circle Markers":
-        color = st.selectbox(label="Choose",options=['DarkRed', 'Yellow','Pink', 'Green', 'Teal', "Blue", "White"])
-        circle_Points = Map.add_circle_markers_from_xy(gdf, x="LONGITUDE", y="LATITUDE",color=color,fill_color=color, radius=5)
+        st.markdown("---")
+        points_or_path = st.radio(label="Select map activity", options=["Markers", "Show Point Progression"], horizontal=True)
+        
+        if points_or_path == "Markers":     #Shows markers only
+            color = st.selectbox(label="Choose",options=['DarkRed', 'Yellow','Pink', 'Green', 'Teal', "Blue", "White"])
+            circle_Points = Map.add_circle_markers_from_xy(data=gdf, x="LONGITUDE", y="LATITUDE",color=color,fill_color=color, radius=5)
+
+        if points_or_path == "Show Point Progression":      #Shows the moving path between markers
+            list_of_path_points = []    #stores coordinates from dataframe, but in long/lat format
+            pathpointforreal = []       #stores corrected coordinates in lat/long form to be used by the Antpath tool
+            color = st.selectbox(label="Choose",options=['DarkRed', 'Yellow','Pink', 'Green', 'Teal', "Blue", "White"])
+            # date_column = st.selectbox("Select the date column", options=in_df.columns)
+            # try:
+            #     gdf[date_column] = pandas.to_datetime(gdf[date_column])
+            # except Exception:
+                # st.error("Select a column containing date data.")
+            try:
+                circle_Points = Map.add_circle_markers_from_xy(data=gdf, x="LONGITUDE", y="LATITUDE",color=color,fill_color=color, radius=5)
+            except ValueError:
+                st.error("Select")
+            for index, row in gdf.iterrows():
+                for pt in list(row['geometry'].coords):
+                    list_of_path_points.append(pt)
+            
+            for ting in list_of_path_points:        #   Takes list and swaps from long/lat tuple and strings to list lat/long floats
+                [longy, laty] = ting
+                ltlng = (str(laty) + "," + str(longy))
+                ltlng2list = [float(value) for value in ltlng.split(",")]
+                # print(ltlng2list)
+                pathpointforreal.append(ltlng2list)
+            plugins.AntPath(locations=pathpointforreal,color=color).add_to(Map)
+
+        #   GOTTA ORDER THE DATAFRAME BY TIME AND DATE THEN ADD THE POINTS IN ORDER TO A LIST TO BE READ BY THE ANTPATH
+
         
     
+    if map_Type == "Cell Sites":
+        gdf.columns = gdf.columns.str.upper()
+        gdf.geometry = gdf["GEOMETRY"]
+        st.markdown("---")
+
+        col1, col2, col3,col4 = st.columns(4)
+        with col1:
+            wedge_color = st.selectbox("Sector Color", options=['Red', 'Blue', 'Green', 'Purple', 'Orange', 'DarkRed', 'Beige', 'DarkBlue', 'DarkGreen', 'CadetBlue', 'Pink', 'LightBlue', 'LightGreen', 'Gray', 'Black', 'LightGray'])
+        with col2:
+            # Long = st.selectbox("Longitude", options=in_df.columns)
+            radii = st.selectbox("Sector Footprint Size", options=in_df.columns)
+
+        with col3:
+            Azimuth = st.selectbox("Sector Azimuth", options=in_df.columns)
+            
+        with col4:
+            beam_width = st.selectbox("Sector Beam Width", options=in_df.columns)
+
+        try:
+            for index, row in gdf.iterrows():           #   iterates through the data frame to place points,shapes
+                # print(row["LATITUDE"],row["LONGITUDE"])
+                plugins.SemiCircle((row["LATITUDE"],row["LONGITUDE"]),      #wedge shape 
+                radius=row[radii]/2,
+                direction=row[Azimuth],
+                arc=row[beam_width],
+                color=None,
+                fill_color=wedge_color,
+                opacity=1,
+                fill_opacity=.5,
+                popup="Azimuth - " + str(row[Azimuth]) + " degrees, Beam width - " + str(row[beam_width]) + " degrees",
+                ).add_to(Map)
+                length = row[radii]/1000  #convert to meters
+                # print(length/1000)
+                half_beamwidth = row[beam_width] / 2
+                upside =  (row[Azimuth] + half_beamwidth)  #calc angle from center of beam up
+                upside %= 360       # accomodates crossing 360 degree point
+                downside = (row[Azimuth] - half_beamwidth)  #calc angle from center of beam down
+                downside %= 360      # accomodates crossing 360 degree point
+                # print("AZ- "+str(row[Azimuth]) + " up-" + str(upside) + " down-" + str(downside))
+
+                up_lat, up_lon = get_point_at_distance(row["LATITUDE"], row["LONGITUDE"],d=length,bearing=upside)
+                dwn_lat, dwn_lon = get_point_at_distance(row["LATITUDE"], row["LONGITUDE"],d=length,bearing=downside)
+                leafmap.folium.PolyLine([[row["LATITUDE"],row["LONGITUDE"]], [up_lat,up_lon]],color=wedge_color).add_to(Map)    # lines for exterior wedge shape
+                leafmap.folium.PolyLine([[row["LATITUDE"],row["LONGITUDE"]], [dwn_lat,dwn_lon]],color=wedge_color).add_to(Map)
+
+            cell2html = st.button("Cell Map to HTML")
+            if cell2html == True:
+                Map.to_html("C:\\Users\\CR\\Desktop\\usntest\\test.html")  
+        except TypeError:
+            st.info("Assign columns for Sector Footprint Size (Radius from Station in Meters), Tower Direction/Azimuth (Degrees), & Beam Width (Degrees)")
+        
     Map.to_streamlit()
     
     col1, col2, col3, col4, col5 = st.columns(5)
     with col1:
-        sav_KML = st.button("Save to KML")
+        sav_HTML = st.button("Export to HTML")
     with col2:
-        sav_HTML = st.button("Save to HTML")
-        
+        print("")
     with col3:
         print("")
     with col4:
@@ -139,17 +298,10 @@ def KML_output_file(name_for_file):
     out_file = os.path.expanduser(out_folder+name_for_file)
     return out_file
 
-def convert_hex6_to_hex8_color(hex6):
-    #   This function converts hex 6 colors to hex 8
-    hex6 = list(hex6.strip("#"))  # convert string to list and remove #
-    color_hex_order = [5,4,3,2,1,0] # reorders hex 6 basically  it flips it
-    hex6 = "#00" + "".join([hex6[i] for i in color_hex_order])  # to change opacity alter "00" value at front
-    return hex6
-
 def get_file_encoding(infile):
     return (chardet.detect(infile.read()))
 
-
+    
 def preview_csv(infile, outfile):       #   This facilitates the onscreen preview and KML creation
     try:
         dataf = pandas.read_csv(infile, encoding=selected_encoding)
@@ -166,122 +318,219 @@ def preview_csv(infile, outfile):       #   This facilitates the onscreen previe
         # style_table = first_five_lines.style.hide_index()
         st.dataframe(data=first_five_lines, use_container_width=True)
         headers = dataf.columns.to_list()
-        # print(headers)
-        st.sidebar.subheader("Assign Column Headers")
-        label_for_icons = st.sidebar.selectbox("Map Icon Labels", options=headers)
-        # print(label_for_icons)
-        point_description = st.sidebar.selectbox("Additional Descriptions", options=headers)
-        if footprint == True:
-            radii = st.sidebar.selectbox("Radius/Distance-from-Point in Meters", options=headers)
-        # print(point_description)
-        
-        if KML == True:
-            if len(filename) == 0:
-                with notices:
-                    st.error("Map Name Required")
-            if len(filename) > 0:
-                kml = simplekml.Kml()
-                Descript = point_description
-                Label = label_for_icons
-                
-                # try:
-                if footprint == True: 
-                    footy_color = get_footprint_color(icon_Color=icon)
-                    for lon, lat, lab, desc, rad in zip(dataf["LONGITUDE"], dataf["LATITUDE"], dataf[Label], dataf[Descript], dataf[radii]):  #zip with for 
-                
-                        lo_search = re.findall(r'([0-9.-]+).+?([0-9.-]+)', str(lon))    #regex to find what appears to be longitude, makes tuple, only provides first result of tuple
-                        first_result_lo = map(operator.itemgetter(0), lo_search)
-                        for i in first_result_lo:
-                            long = i
-
-                        la_search = re.findall(r'([0-9.-]+).+?([0-9.-]+)', str(lat))
-                        first_result_la = map(operator.itemgetter(0), la_search)
-                        for f in first_result_la:
-                            lati = f
-
-                        point = kml.newpoint(name=lab, coords= [(long, lati)], description=desc) #15(lon),15(lat) are geological coordinates of the location.     
-                        point.style.iconstyle.icon.href = selected_icon[icon]
-                        if footprint == True:
-                            try:
-                                polycircle = polycircles.Polycircle(latitude=float(lati),
-                                                longitude=float(long),
-                                                radius=float(rad),
-                                                number_of_vertices=72)
-
-                                pol = kml.newpolygon(name=(str(lati) + ', ' + str(long) + ', ' + str(rad)), outerboundaryis=polycircle.to_kml())
-                                pol.style.polystyle.color = \
-                                    footy_color #changes the radius circle color
-                            except ValueError:
-                                with notices:
-                                    st.error("Value Error - Inspect Latitude, Longitude, and Radius Columns")
-                if footprint == False: 
-                    for lon, lat, lab, desc in zip(dataf["LONGITUDE"], dataf["LATITUDE"], dataf[Label], dataf[Descript]):  #zip with for 
-
-                        lo_search = re.findall(r'([0-9.-]+).+?([0-9.-]+)', str(lon))    #regex to find what appears to be longitude, makes tuple, only provides first result of tuple
-                        first_result_lo = map(operator.itemgetter(0), lo_search)
-                        for i in first_result_lo:
-                            long = i
-
-                        la_search = re.findall(r'([0-9.-]+).+?([0-9.-]+)', str(lat))
-                        first_result_la = map(operator.itemgetter(0), la_search)
-                        for f in first_result_la:
-                            lati = f
-
-                        point = kml.newpoint(name=lab, coords= [(long, lati)], description=desc) #15(lon),15(lat) are geological coordinates of the location.     
-                        point.style.iconstyle.icon.href = selected_icon[icon]
-            # except KeyError:
-            #     print("There was a keyerror")
-
-                kml.save(outfile) # To save kml file to use in google earth use:
-                with notices:
-                    st.success("KML file has been stored to: " + outfile)
+        #
         return headers, dataf 
     except UnicodeError:
         st.error("Decoding error. Try another encoding method.")
         pass 
 
-st.sidebar.markdown("<h1 style='text-align: left; font-family: impact; font-size: 77px; color: red;'>  LOCUS</h1>", unsafe_allow_html=True)
-st.sidebar.write("CSV to KML Geolocation Tool")
-st.sidebar.markdown("---")
+def create_kml(df_in, outfile):
+    headers = df_in.columns.to_list()
+    # print(headers)
+    st.subheader("Assign Columns for KML")
+    label_for_icons = st.selectbox("Map Icon Labels", options=headers)
+    # print(label_for_icons)
+    point_description = st.selectbox("Additional Descriptions", options=headers)
+    if footprint == True:
+        radii = st.selectbox("Radius/Distance-from-Point in Meters", options=headers)
+    # print(point_description)
+    if KML == True:
+        if len(filename) == 0:
+            with notices:
+                st.error("Map Name Required")
+        if len(filename) > 0:
+            kml = simplekml.Kml()
+            Descript = point_description
+            Label = label_for_icons
+            
+            # try:
+            if footprint == True: 
+                footy_color = get_footprint_color(icon_Color=icon)
+                for lon, lat, lab, desc, rad in zip(df_in["LONGITUDE"], df_in["LATITUDE"], df_in[Label], df_in[Descript], df_in[radii]):  #zip with for 
+            
+                    lo_search = re.findall(r'([0-9.-]+).+?([0-9.-]+)', str(lon))    #regex to find what appears to be longitude, makes tuple, only provides first result of tuple
+                    first_result_lo = map(operator.itemgetter(0), lo_search)
+                    for i in first_result_lo:
+                        long = i
+
+                    la_search = re.findall(r'([0-9.-]+).+?([0-9.-]+)', str(lat))
+                    first_result_la = map(operator.itemgetter(0), la_search)
+                    for f in first_result_la:
+                        lati = f
+
+                    point = kml.newpoint(name=lab, coords= [(long, lati)], description=desc) #15(lon),15(lat) are geological coordinates of the location.     
+                    point.style.iconstyle.icon.href = selected_icon[icon]
+                    if footprint == True:
+                        try:
+                            polycircle = polycircles.Polycircle(latitude=float(lati),
+                                            longitude=float(long),
+                                            radius=float(rad),
+                                            number_of_vertices=72)
+
+                            pol = kml.newpolygon(name=(str(lati) + ', ' + str(long) + ', ' + str(rad)), outerboundaryis=polycircle.to_kml())
+                            pol.style.polystyle.color = \
+                                footy_color #changes the radius circle color
+                        except ValueError:
+                            with notices:
+                                st.error("Value Error - Inspect Latitude, Longitude, and Radius Columns")
+            if footprint == False: 
+                for lon, lat, lab, desc in zip(df_in["LONGITUDE"], df_in["LATITUDE"], df_in[Label], df_in[Descript]):  #zip with for 
+
+                    lo_search = re.findall(r'([0-9.-]+).+?([0-9.-]+)', str(lon))    #regex to find what appears to be longitude, makes tuple, only provides first result of tuple
+                    first_result_lo = map(operator.itemgetter(0), lo_search)
+                    for i in first_result_lo:
+                        long = i
+
+                    la_search = re.findall(r'([0-9.-]+).+?([0-9.-]+)', str(lat))
+                    first_result_la = map(operator.itemgetter(0), la_search)
+                    for f in first_result_la:
+                        lati = f
+
+                    point = kml.newpoint(name=lab, coords= [(long, lati)], description=desc) #15(lon),15(lat) are geological coordinates of the location.     
+                    point.style.iconstyle.icon.href = selected_icon[icon]
+        # except KeyError:
+        #     print("There was a keyerror")
+
+            kml.save(outfile) # To save kml file to use in google earth use:
+            with notices:
+                st.success("KML file has been stored to: " + outfile)
+
+def cell_site(in_df):
+    gdf = geopandas.GeoDataFrame(in_df, geometry=geopandas.points_from_xy(in_df.LONGITUDE, in_df.LATITUDE))
+    gdf.columns = gdf.columns.str.upper()
+    gdf.geometry = gdf["GEOMETRY"]
+    col1, col2, col3,col4,col5 = st.columns(5)
+    with col1:
+        Lat = st.selectbox("Latitude", options=in_df.columns)
+    with col2:
+        Long = st.selectbox("Longitude", options=in_df.columns)
+    with col3:
+        radii = st.selectbox("Radius", options=in_df.columns)
+    with col4:
+        Azimuth = st.selectbox("Azimuth", options=in_df.columns)
+    with col5:
+        beam_width = st.selectbox("Beam Width", options=in_df.columns)
+
+    Map = leafmap.Map()
+    Map.zoom_to_gdf(gdf)
+    Map.add_basemap(basemap='ROADMAP')
+    Map.add_basemap(basemap='SATELLITE')
+    Map.add_basemap(basemap='TERRAIN')
+    Map.add_basemap(basemap='HYBRID')
+    Map.add_basemap(basemap='CartoDB.Positron')
+    Map.add_basemap(basemap="CartoDB.DarkMatter")
+    
+    # _Points = Map.add_circle_markers_from_xy(gdf, x="LONGITUDE", y="LATITUDE", radius=5)
+
+    for index, row in gdf.iterrows():
+        print(row["LATITUDE"],row["LONGITUDE"])
+        plugins.SemiCircle((row["LATITUDE"],row["LONGITUDE"]),
+        radius=row[radii],
+        direction=row[Azimuth],
+        arc=row[beam_width],
+        color="darkred",
+        fill_color="darkred",
+        opacity=1,
+        popup="Direction - 0 degrees, arc 90 degrees",
+        ).add_to(Map)
+    Map.to_streamlit()
+    cell2html = st.button("Cell Map to HTML")
+    if cell2html == True:
+        Map.to_html("C:\\Users\\CR\\Desktop\\usntest\\test.html")
+
+def time_range_slider(in_df):
+ ## Range selector
+    try:
+        in_df[datetime_Column] = pandas.to_datetime(in_df[datetime_Column])
+        format = 'YYYY-MM-DD'  # format output
+
+        start_date = min(in_df[datetime_Column]).to_pydatetime()    # get start date of data frame
+        end_date = max(in_df[datetime_Column]).to_pydatetime()      # get end date of data frame
+        slider = st.slider('Select Date (YYYY-MM-DD)', min_value=start_date, value=(start_date,end_date) ,max_value=end_date, format=format)
+        return slider   #kicks out start and end datetime
+    except TypeError:
+        st.error("slider error")
+
+def time_filter(in_df):
+    try:
+        starting, ending = time_range_slider(in_df=in_df)
+        sorted = in_df.sort_values(by=datetime_Column)
+        # print(sorted)
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+                start_date = st.date_input("Start Date",value=starting)     
+        with col2:
+                start_time = st.time_input("Start Time", value=datetime.time(0, 00, 00))
+        with col3:
+                end_date = st.date_input("End Date",value=ending)
+        with col4:
+                end_time = st.time_input("End Time", value=datetime.time(23, 59, 59))
+        first_is = str(start_date) + " " + str(start_time)
+        last_is = str(end_date) + " " + str(end_time)
+        selected_time = sorted[(sorted[datetime_Column] > first_is) & (sorted[datetime_Column] < last_is)]
+        st.table(selected_time)
+        return selected_time
+    except Exception:
+        st.error("Select column with Date/Time data.")
+
+########################################
+########################################
+
+st.markdown("<h1 style='text-align: left; font-family: impact; font-size: 89px; color: red;'>  LOCUS</h1>", unsafe_allow_html=True)
+st.write("An Investigative Geolocation Tool")
+st.markdown("---")
 
 ####    Main Page   ####
 notices = st.empty()
-filename = st.text_input("Provide Map Name*  (.kml will be added automatically)")
+filename = st.text_input(":red[Provide Map Name*]",)
 uploaded_file = st.file_uploader("Choose a CSV file", type=["csv"])
 
 with st.expander("Manage CSV File"):
     lines_t0_remove = st.slider(label="Number of Rows to Remove from Start of Table      (First line must include 'Latitude' and 'Longitude')", min_value=0, max_value=10)
     
-    if uploaded_file != None:
+    if uploaded_file != None:   
         
-        #####   Sidebar settings    #####
-        
-        icon = st.sidebar.selectbox("Select Map Point Icon Style", options=icon_options)
-        footprint = st.sidebar.checkbox("Dataset includes radius/area information",)
-
-        suggested_encoding = get_file_encoding(uploaded_file)
-        
-        encode_options = st.radio(label="Encoding Options", options=["Use Suggested Encoding: " + str(suggested_encoding['encoding']), "Use Manual Encoding Selection"])
+        suggested_encoding = get_file_encoding(uploaded_file)       #   block attempts to find csv encoding and allow manual choice
+        encode_options = st.radio(label="Encoding Options", options=["Use Suggested Encoding: " + str(suggested_encoding['encoding']), "Use Manual Encoding Selection"],horizontal=True)
         if encode_options == "Use Suggested Encoding: " + str(suggested_encoding['encoding']):
             selected_encoding = suggested_encoding['encoding']
         if encode_options == "Use Manual Encoding Selection":       
             selected_encoding = st.selectbox("Choose File Encoding",options=["utf-8", 'utf-8-sig', 'utf-16', 'ISO-8859-1'])
      
-        uploaded_file.seek(0)
-        
-        KML = st.sidebar.button("GENERATE KML")
-        st.sidebar.markdown("---")
+        uploaded_file.seek(0)       #refresh action
         
         outFile = KML_output_file(filename)
-        print(outFile)
+        # print(outFile)
         get_headings, preview_data = preview_csv(uploaded_file, outfile=outFile)
-       
+
+
 if uploaded_file != None:
+    with st.expander("Date/Time Filter & Declutter"):
+        filterbytime = st.checkbox("Filter by Date/Time")
+        if filterbytime == True:
+            datetime_Column = st.selectbox("Select Date/Time Column", options=preview_data.columns)
+            try:
+                preview_data = time_filter(preview_data)
+            except Exception:
+                st.error("Select column containing date/time data.")
     # try:
-    tab1, tab2 = st.tabs(["Preview Map", "Analysis Maps"])
+    tab1, tab2, tab3 = st.tabs(["Preview/KML Map", "Analysis Maps", "Create Geofence"])
     with tab1:
-        st.map(preview_data)
+        try:
+            st.map(preview_data)
+        except TypeError:
+            st.error("Ensure you have correct settings in Manage CSV and Date/Time Filtering")
+        icon = st.selectbox("Select Map Point Icon Style", options=icon_options)
+        footprint = st.checkbox("Dataset includes radius/area information",)
+        
+        KML = st.button("GENERATE KML")
+        st.markdown("---")
+        create_kml(df_in=preview_data,outfile=outFile)
     with tab2:
         make_map(preview_data)
+        
+    with tab3:
+        make_geofence_map()
+    
     # except Exception:
     #     st.info("Map preview not available with currently selected data. Select Manage CSV File to adjust your data. Column headers must have Latitude and Longitude.")
