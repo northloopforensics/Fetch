@@ -18,14 +18,13 @@ import leafmap.foliumap as leafmap
 from leafmap.foliumap import plugins
 import geopandas
 import folium
-from shapely.wkt import loads
 from math import asin, atan2, cos, degrees, radians, sin
 from folium.plugins import Draw, Geocoder
 from streamlit_folium import st_folium
 import pyperclip
 import datetime
 import geocoder
-import PySimpleGUI as sg
+
 
 st.set_page_config(
    page_title="Fetch v3.0",
