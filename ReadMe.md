@@ -45,5 +45,7 @@ Below image is Google Earth output.
 
 ![alt text](https://user-images.githubusercontent.com/73806121/216791825-56539e9d-67fc-483c-b8b7-1052e5805f0b.png)
 
+Below image is I.P. address query result using ipinfo.io
 
+![alt text](https://user-images.githubusercontent.com/73806121/228654864-60173577-0cfc-4ab7-bcab-a8eabd65d764.png)
 
