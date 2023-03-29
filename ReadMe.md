@@ -9,7 +9,7 @@ A tool to help investigators convert raw data into actionable maps.
 1.  Run the installer executable for Windows
 2.  Fetch will be added to your Start Menu
 
-![alt text](https://user-images.githubusercontent.com/73806121/216791260-3b9b8ce6-4579-4df2-a1a0-7a3dfb221c16.png)
+![alt text](https://user-images.githubusercontent.com/73806121/228640870-cfb2cb6e-9855-4c00-8890-f83359621282.png)
 
 3.  A browser tab will open when you click on Fetch
 
