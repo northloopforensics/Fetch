@@ -15,7 +15,7 @@ A tool to help investigators convert raw data into actionable maps.
 
 4.  As the tool opens you may generate a geo-fence by drawing shapes on the provided map to collect coordinates. Simply close the shape you are drawing to see the latitude and logitude for each shape you create. 
 
-![alt text](https://user-images.githubusercontent.com/73806121/228633762-7c16eab9-754b-4dfb-8819-ae242682d3dc.png)
+![alt text](https://user-images.githubusercontent.com/73806121/228658331-31734cbf-5ee8-4ce9-b3c3-68b76b802609.png)
 
 OR  You can provide a data set and generate your own maps.
 
