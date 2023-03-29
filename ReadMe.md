@@ -1,37 +1,45 @@
-A tool to convert Latitude and Longitude values found in a CSV document into a Google Earth KML file.
+A tool to help investigators convert raw data into actionable maps. 
 
-# Version 2 is here!
+# Version 3 is here!
 
 
-![alt text](https://user-images.githubusercontent.com/73806121/217416081-58256aa9-839d-48ff-a338-f8ce18febe4e.png)
+![alt text](https://user-images.githubusercontent.com/73806121/228633379-85d9099e-33b9-4ccf-841f-9f012e994a85.png)
 
 ### Here is how it works:
 1.  Run the installer executable for Windows
-2.  Locus will be added to your Start Menu
+2.  Fetch will be added to your Start Menu
 
 ![alt text](https://user-images.githubusercontent.com/73806121/216791260-3b9b8ce6-4579-4df2-a1a0-7a3dfb221c16.png)
 
-3.  A browser tab will open when you click on Locus
+3.  A browser tab will open when you click on Fetch
 
-4.  Provide a name for the map you wish to create and select the CSV file with your map data
+4.  As the tool opens you may generate a geo-fence by drawing shapes on the provided map to collect coordinates. Simply close the shape you are drawing to see the latitude and logitude for each shape you create. 
 
-![alt text](https://user-images.githubusercontent.com/73806121/217416350-1ffb9fbf-9e08-40a8-a44e-d65f86904dd7.png)
+![alt text](https://user-images.githubusercontent.com/73806121/228633762-7c16eab9-754b-4dfb-8819-ae242682d3dc.png)
 
-5.  If the CSV is correctly configured you will see a preview map. If not, the collapsable Manage CSV window allows you to select the number of header lines to remove from the CSV.  **The CSV file MUST contain columns labeled "Latitude" and "Longitude".**  The lack of a preview map does **NOT** mean KML is unable to be produced.
+OR  You can provide a data set and generate your own maps.
 
-![alt text](https://user-images.githubusercontent.com/73806121/216791634-5de2c0d1-ed32-45c0-806f-575f744e80d8.png)
+![alt text](https://user-images.githubusercontent.com/73806121/228634875-80765455-a23b-48a2-abe7-80dc9c930c8b.png)
 
-6.  Map labels are assigned by selecting a column.  The data in that column will appear with map points on Google Earth.
+5.  If the CSV is correctly configured you will see a preview map. If not, the collapsable Manage Ingested Data window allows you to select the number of header lines to remove, filter for specific time frames, and average/consolidate points for a time interval (ex. 1 point every 5 minutes).  **The CSV file MUST contain columns labeled "Latitude" and "Longitude".**
 
-7.  Descriptions can be assigned to each location to provide additional information about that point.
+![alt text](https://user-images.githubusercontent.com/73806121/228635721-460059b3-dab4-4f1f-b652-6c9f586df7ab.png)
 
-8.  Data sets that include accuracy or distance-from-point data can also be populated.
+6.  Analysis Maps include points, heat map, and cell site options.
 
-![alt text](https://user-images.githubusercontent.com/73806121/216791812-f5f7b716-d9c0-42e4-9596-155d8b69fcb5.png)
+![alt text](https://user-images.githubusercontent.com/73806121/228637473-05096005-f11b-46f1-bf14-58629ef7e2c0.png)
 
-9.  After making the appropriate selections for your data set, hit the Generate KML button.  Your map will be saved to your Documents folder in a directory named Locus_Maps. 
+7.  Each of these analysis options may prompt you for additional information before data will populate. 
 
-![alt text](https://user-images.githubusercontent.com/73806121/217417080-5f3a89e1-03f1-4dfb-8617-6f70695c3e51.png)
+8.  Remove map layers to access new helpful views.
+
+![alt text](https://user-images.githubusercontent.com/73806121/228639100-54afb552-2309-4f5c-80a4-1e82b46ef334.png)
+
+
+
+9.  KML Map labels are assigned by selecting a column. Descriptions can be assigned to each location to provide additional information about that point. The data in that column will appear with map points on Google Earth.After making the appropriate selections for your data set, hit the Generate KML button.  Your map will be saved to your Documents folder in a directory named Fetch_Maps. 
+
+![alt text](https://user-images.githubusercontent.com/73806121/228637714-52c48ce7-6400-491c-a58e-7cd537fcab3d.png)
 
 Below image is Google Earth output.
 
