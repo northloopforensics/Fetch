@@ -13,7 +13,7 @@ Fetch will be added to your Start Menu. The first run of the program will launch
 
 A browser tab will then open to Fetch.
 
-As the tool opens you may generate a geo-fence by drawing shapes on the provided map to collect coordinates. Simply close the shape you are drawing to see the latitude and longitude for each shape you create. 
+As the tool opens you may generate a geo-fence by drawing shapes on the provided map to collect coordinates. Simply close the shape you are drawing to see the latitude and longitude for each point you create. 
 
 ![alt text](https://user-images.githubusercontent.com/73806121/228658331-31734cbf-5ee8-4ce9-b3c3-68b76b802609.png)
 
