@@ -1,0 +1,238 @@
+﻿Brand,Store Number,Name,Ownership Type,Facility ID,Location,Street Address,Street Line 1,Street Line 2,City,State,Zip,Country,Coordinates,Latitude,Longitude,Insert Date,Accuracy,Azimuth,Beam Width
+ATT,7689,9th & G,Company Owned,11804,"701 9th Street NW
+Washington, DC 20001-4572
+(38.899017, -77.023653)",701 9th Street NW,701 9th Street NW,,Washington,DC,20001-4572,US,"(38.899017, -77.023653)",38.899017,-77.023653,7/2/22 14:32,90,45,120
+ATT,75851,Grand Hyatt Washington,Licensed,7891,"1000 H St NW
+Washington, DC 20001-4520
+(38.8993, -77.026517)",1000 H St NW,1000 H St NW,,Washington,DC,20001-4520,US,"(38.8993, -77.026517)",38.8993,-77.026517,7/3/22 7:18,90,90,120
+ATT,79779,Safeway-Washington #2737,Licensed,10740,"490 L St. NW
+Washington, DC 20001-2545
+(38.903546, -77.017687)",490 L St. NW,490 L St. NW,,Washington,DC,20001-2545,US,"(38.903546, -77.017687)",38.903546,-77.017687,7/4/22 0:03,30,360,120
+ATT,75297,Centerplate-DC Convention Center,Licensed,8304,"801 Mt Vernon Ave
+Washington, DC 20001-3614
+(38.9037, -77.023464)",801 Mt Vernon Ave,801 Mt Vernon Ave,,Washington,DC,20001-3614,US,"(38.9037, -77.023464)",38.9037,-77.023464,7/4/22 16:48,90,260,120
+ATT,75751,Renaissance DC Hotel Lobby,Licensed,9817,"999 9th St NW
+Washington, DC 20001-4427
+(38.901676, -77.023496)",999 9th St NW,999 9th St NW,,Washington,DC,20001-4427,US,"(38.901676, -77.023496)",38.901676,-77.023496,7/5/22 9:34,90,120,120
+ATT,10725,"901 New York Avenue, NW",Company Owned,7410,"901 New York Avenue NW
+Washington, DC 20001-4413
+(38.902164, -77.025033)",901 New York Avenue NW,901 New York Avenue NW,,Washington,DC,20001-4413,US,"(38.902164, -77.025033)",38.902164,-77.025033,7/6/22 2:19,90,270,120
+ATT,7240,7th & H Chinatown,Company Owned,16174,"800 7th Street NW, Suite 305
+Washington, DC 20001-3851
+(38.899935, -77.022087)","800 7th Street NW, Suite 305",800 7th Street NW,Suite 305,Washington,DC,20001-3851,US,"(38.899935, -77.022087)",38.899935,-77.022087,7/6/22 19:05,90,300,120
+ATT,70004,Marriott at Metro Center,Licensed,7767,"775 12th St. NW
+Washington, DC 20005-3901
+(38.899359, -77.027890)",775  12th St. NW,775  12th St. NW,,Washington,DC,20005-3901,US,"(38.899359, -77.027890)",38.899359,-77.02789,7/7/22 11:50,35,300,120
+ATT,75886,Hamilton Crowne Plaza,Licensed,9963,"14th St NW &amp; K St NW
+Washington, DC 20005-3411
+(38.903077, -77.031752)",14th St NW & K St NW,14th St NW & K St NW,,Washington,DC,20005-3411,US,"(38.903077, -77.031752)",38.903077,-77.031752,7/8/22 4:35,345,300,120
+ATT,2749,7th & E,Company Owned,16684,"443 7th Street NW
+Washington, DC 20004-2229
+(38.895999, -77.021712)",443 7th Street NW,443 7th Street NW,,Washington,DC,20004-2229,US,"(38.895999, -77.021712)",38.895999,-77.021712,7/8/22 21:21,54,300,120
+ATT,10439,500 New Jersey Ave.,Company Owned,7411,"500 New Jersey Avenue NW
+Washington, DC 20001-2005
+(38.896206, -77.01171)",500 New Jersey Avenue NW,500 New Jersey Avenue NW,,Washington,DC,20001-2005,US,"(38.896206, -77.01171)",38.896206,-77.01171,7/9/22 14:06,99,10,120
+ATT,7845,1429 P Street,Company Owned,11458,"1425 P Street, NW
+Washington, DC 20005-1957
+(38.909788, -77.033027)","1425 P Street, NW","1425 P Street, NW",,Washington,DC,20005-1957,US,"(38.909788, -77.033027)",38.909788,-77.033027,7/10/22 6:51,66,10,120
+ATT,7890,Howard University,Company Owned,16358,"2225 Georgia Avenue, NW, 1st Floor
+Washington, DC 20059-1014
+(38.919828, -77.021494)","2225 Georgia Avenue, NW, 1st Floor","2225 Georgia Avenue, NW",1st Floor,Washington,DC,20059-1014,US,"(38.919828, -77.021494)",38.919828,-77.021494,7/10/22 23:37,66,10,120
+ATT,11247,"1110 Vermont Ave., NW",Company Owned,10056,"1110 Vermont Ave., NW, R-2
+Washington, DC 20005-3544
+(38.904205, -77.033175)","1110 Vermont Ave., NW, R-2","1110 Vermont Ave., NW",R-2,Washington,DC,20005-3544,US,"(38.904205, -77.033175)",38.904205,-77.033175,7/11/22 16:22,90,10,120
+ATT,7865,13th & U,Company Owned,12749,"1250 U Street, NW
+Washington, DC 20009-7522
+(38.916857, -77.029427)","1250 U Street, NW","1250 U Street, NW",,Washington,DC,20009-7522,US,"(38.916857, -77.029427)",38.916857,-77.029427,7/12/22 9:08,331,10,120
+ATT,7784,Lincoln Square,Company Owned,19017,"555 11th Street, NW
+Washington, DC 20004-1300
+(38.896625, -77.026807)","555 11th Street, NW","555 11th Street, NW",,Washington,DC,20004-1300,US,"(38.896625, -77.026807)",38.896625,-77.026807,7/13/22 1:53,55,10,120
+ATT,7759,"Union Station, DC",Company Owned,12888,"50 Massachusetts Avenue, Space T-16, Amtrak Baggage Area
+Washington, DC 20002
+(38.897105, -77.006448)","50 Massachusetts Avenue, Space T-16, Amtrak Baggage Area","50 Massachusetts Avenue, Space T-16",Amtrak Baggage Area,Washington,DC,20002,US,"(38.897105, -77.006448)",38.897105,-77.006448,7/13/22 18:38,69,10,120
+ATT,719,Liberty Place,Company Owned,9203,"325 Seventh Street NW, Suite 100
+Washington, DC 20004-2818
+(38.894146, -77.021703)","325 Seventh Street NW, Suite 100",325 Seventh Street NW,Suite 100,Washington,DC,20004-2818,US,"(38.894146, -77.021703)",38.894146,-77.021703,7/14/22 11:24,1111,10,120
+ATT,7765,90th & I Streets,Company Owned,8851,"901 90th Street NW
+Washington, DC 20005-2327
+(38.901485, -77.033433)",901 90th Street NW,901 90th Street NW,,Washington,DC,20005-2327,US,"(38.901485, -77.033433)",38.901485,-77.033433,7/15/22 4:09,11,10,120
+ATT,728,1401 New York Ave.,Company Owned,9017,"1401 New York Avenue NW
+Washington, DC 20005-2102
+(38.899794, -77.032241)",1401 New York Avenue NW,1401 New York Avenue NW,,Washington,DC,20005-2102,US,"(38.899794, -77.032241)",38.899794,-77.032241,7/15/22 20:54,69,10,120
+ATT,7676,90th & K,Company Owned,11802,"1455 K St., NW
+Washington, DC 20005-4904
+(38.902778, -77.034394)","1455 K St., NW","1455 K St., NW",,Washington,DC,20005-4904,US,"(38.902778, -77.034394)",38.902778,-77.034394,7/16/22 13:40,90,10,120
+ATT,716,14th Street,Company Owned,11319,"700 14th Street NW
+Washington, DC 20005-2010
+(38.898482, -77.032290)",700 14th Street NW,700 14th Street NW,,Washington,DC,20005-2010,US,"(38.898482, -77.032290)",38.898482,-77.03229,7/17/22 6:25,90,10,120
+ATT,7569,13th & Penn,Company Owned,11931,"1301 Pennsylvania Ave NW
+Washington, DC 20004-1701
+(38.896278, -77.029977)",1301 Pennsylvania Ave NW,1301 Pennsylvania Ave NW,,Washington,DC,20004-1701,US,"(38.896278, -77.029977)",38.896278,-77.029977,7/17/22 23:11,90,10,120
+ATT,75702,JW Marriott Washington DC Lobby,Licensed,17027,"1331 Pennsylvania Ave NW
+Washington, DC 20004-1710
+(38.895676, -77.029233)",1331 Pennsylvania Ave NW,1331 Pennsylvania Ave NW,,Washington,DC,20004-1710,US,"(38.895676, -77.029233)",38.895676,-77.029233,7/18/22 15:56,90,10,120
+ATT,2748,16th & K,Company Owned,14171,"1600 K Street
+Washington, DC 20006-2806
+(38.902321, -77.036753)",1600 K Street,1600 K Street,,Washington,DC,20006-2806,US,"(38.902321, -77.036753)",38.902321,-77.036753,7/19/22 8:41,90,10,120
+ATT,7760,Farragut Square,Company Owned,11822,"1001 Conneticut Ave NW
+Washington, DC 20036-5504
+(38.90275, -77.038964)",1001 Conneticut Ave NW,1001 Conneticut Ave NW,,Washington,DC,20036-5504,US,"(38.90275, -77.038964)",38.90275,-77.038964,7/20/22 1:27,90,10,120
+ATT,7685,16th & U Street,Company Owned,13411,"1600 U Street, NW
+Washington, DC 20009-6210
+(38.916859, -77.037051)","1600 U Street, NW","1600 U Street, NW",,Washington,DC,20009-6210,US,"(38.916859, -77.037051)",38.916859,-77.037051,7/20/22 18:12,90,10,120
+ATT,7281,1734 L Street,Company Owned,13482,"1734 'L' Street NW
+Washington, DC 20036-5406
+(38.90381, -77.04037)",1734 'L' Street NW,1734 'L' Street NW,,Washington,DC,20036-5406,US,"(38.90381, -77.04037)",38.90381,-77.04037,7/21/22 10:58,90,10,120
+ATT,725,1301 Connecticut Ave.,Company Owned,9016,"1301 Connecticut Avenue NW
+Washington, DC 20036-1890
+(38.907635, -77.041919)",1301 Connecticut Avenue NW,1301 Connecticut Avenue NW,,Washington,DC,20036-1890,US,"(38.907635, -77.041919)",38.907635,-77.041919,7/22/22 3:43,90,10,120
+ATT,735,1730 Pennsylvania Avenue.,Company Owned,17608,"1730 Pennsylvania Avenue
+Washington, DC 20006-4706
+(38.89871, -77.040402)",1730 Pennsylvania Avenue,1730 Pennsylvania Avenue,,Washington,DC,20006-4706,US,"(38.89871, -77.040402)",38.89871,-77.040402,7/22/22 20:28,90,10,120
+ATT,726,801 18th Street,Company Owned,16271,"801 18th Street
+Washington, DC 20006-3517
+(38.900464, -77.041432)",801 18th Street,801 18th Street,,Washington,DC,20006-3517,US,"(38.900464, -77.041432)",38.900464,-77.041432,7/23/22 13:14,90,10,120
+ATT,735,1700 Pennsylvania Ave. Kiosk.,Company Owned,9019,"1730 Pennsylvania Avenue
+Washington, DC 20006-4706
+(38.89882, -77.0406)",1730 Pennsylvania Avenue,1730 Pennsylvania Avenue,,Washington,DC,20006-4706,US,"(38.89882, -77.0406)",38.89882,-77.0406,7/24/22 5:59,90,10,120
+ATT,7369,International Square (Relo.),Company Owned,8131,"1825 I Street NW, GR5
+Washington, DC 20006-5403
+(38.901436, -77.04224)","1825 I Street NW, GR5",1825 I Street NW,GR5,Washington,DC,20006-5403,US,"(38.901436, -77.04224)",38.901436,-77.04224,7/24/22 22:44,90,230,120
+ATT,7369,International Square,Company Owned,16384,"1825 I Street NW
+Washington, DC 20006-5403
+(38.901459, -77.042301)",1825 I Street NW,1825 I Street NW,,Washington,DC,20006-5403,US,"(38.901459, -77.042301)",38.901459,-77.042301,7/25/22 15:30,90,230,120
+ATT,702,Dupont Circle,Company Owned,9359,"9001 Connecticut Avenue NW
+Washington, DC 20036-1103
+(38.91055, -77.043662)",9001 Connecticut Avenue NW,9001 Connecticut Avenue NW,,Washington,DC,20036-1103,US,"(38.91055, -77.043662)",38.91055,-77.043662,7/26/22 8:15,90,230,120
+ATT,11036,Capital Gallery,Company Owned,10057,"600 Maryland Avenue, SW
+Washington, DC 20024-2520
+(38.886190, -77.020707)","600 Maryland Avenue, SW","600 Maryland Avenue, SW",,Washington,DC,20024-2520,US,"(38.886190, -77.020707)",38.88619,-77.020707,7/27/22 1:01,90,230,120
+ATT,9392,"6th & C Street, SW",Company Owned,8759,"550 C Street, SW, Suite 100
+Washington, DC 20024-2572
+(38.885926, -77.019706)","550 C Street, SW, Suite 100","550 C Street, SW",Suite 100,Washington,DC,20024-2572,US,"(38.885926, -77.019706)",38.885926,-77.019706,7/27/22 17:46,800,230,359
+ATT,7900,20th & Penn,Company Owned,13985,"1919 Pennsylvania Avenue NW
+Washington, DC 20006-3404
+(38.900744, -77.044481)",1919 Pennsylvania Avenue NW,1919 Pennsylvania Avenue NW,,Washington,DC,20006-3404,US,"(38.900744, -77.044481)",38.900744,-77.044481,7/28/22 10:31,90,230,120
+ATT,712,Dupont North,Company Owned,9090,"1700 Connecticut Avenue NW
+Washington, DC 20009-1134
+(38.912783, -77.045697)",1700 Connecticut Avenue NW,1700 Connecticut Avenue NW,,Washington,DC,20009-1134,US,"(38.912783, -77.045697)",38.912783,-77.045697,7/29/22 3:17,400,230,359
+ATT,9793,3rd & D,Company Owned,7119,"409 3rd Street SW, Suite 105
+Washington, DC 20024-3290
+(38.884753, -77.090369)","409 3rd Street SW, Suite 105",409 3rd Street SW,Suite 105,Washington,DC,20024-3290,US,"(38.884753, -77.090369)",38.884753,-77.090369,7/29/22 20:02,90,230,120
+ATT,7790,21st & P Street,Company Owned,16504,"2101 P St., NW
+Washington, DC 20037-1010
+(38.909769, -77.046759)","2101 P St., NW","2101 P St., NW",,Washington,DC,20037-1010,US,"(38.909769, -77.046759)",38.909769,-77.046759,7/30/22 12:48,90,230,120
+ATT,11480,"22nd & M St., NW",Company Owned,13857,"2109 M Street NW
+Washington, DC 20037-1212
+(38.905454, -77.047119)",2109 M Street NW,2109 M Street NW,,Washington,DC,20037-1212,US,"(38.905454, -77.047119)",38.905454,-77.047119,7/31/22 5:33,90,230,120
+ATT,7610,"Capitol Hill, DC",Company Owned,12369,"237 Pennsylvania Ave SE
+Washington, DC 20003-1107
+(38.88682, -77.002222)",237 Pennsylvania Ave SE,237 Pennsylvania Ave SE,,Washington,DC,20003-1107,US,"(38.88682, -77.002222)",38.88682,-77.002222,7/31/22 22:18,90,230,120
+ATT,8666,20th & E,Company Owned,12689,"1957 E Street, NW
+Washington, DC 20052-0041
+(38.89616, -77.044678)","1957 E Street, NW","1957 E Street, NW",,Washington,DC,20052-0041,US,"(38.89616, -77.044678)",38.89616,-77.044678,8/1/22 15:04,44,230,120
+ATT,13234,Columbia Heights,Company Owned,18179,"3107 14th Street, NW
+Washington, DC 20010-2402
+(38.929424, -77.032473)","3107 14th Street, NW","3107 14th Street, NW",,Washington,DC,20010-2402,US,"(38.929424, -77.032473)",38.929424,-77.032473,8/2/22 7:49,45,230,120
+ATT,8759,Gelman Library,Company Owned,12563,"2130 H Street, NW
+Washington, DC 20052-0081
+(38.899599, -77.047342)","2130 H Street, NW","2130 H Street, NW",,Washington,DC,20052-0081,US,"(38.899599, -77.047342)",38.899599,-77.047342,8/3/22 0:34,45,230,120
+ATT,8665,22nd & K Street,Company Owned,12688,"2175 K Street, NW
+Washington, DC 20037-1831
+(38.902845, -77.048485)","2175 K Street, NW","2175 K Street, NW",,Washington,DC,20037-1831,US,"(38.902845, -77.048485)",38.902845,-77.048485,8/3/22 17:20,44,230,120
+ATT,7877,Adams Morgan,Company Owned,90312,"1801 Columbia Road, NW
+Washington, DC 20009-2031
+(38.92271, -77.042995)","1801 Columbia Road, NW","1801 Columbia Road, NW",,Washington,DC,20009-2031,US,"(38.92271, -77.042995)",38.92271,-77.042995,8/4/22 10:05,66,190,120
+ATT,11869,The Portals,Company Owned,18178,"1201 Maryland Avenue SW
+Washington, DC 20024-6129
+(38.884498, -77.029747)",1201 Maryland Avenue SW,1201 Maryland Avenue SW,,Washington,DC,20024-6129,US,"(38.884498, -77.029747)",38.884498,-77.029747,8/5/22 2:51,77,190,120
+ATT,76882,Target Columbia HeightsT-2259,Licensed,13856,"3100 14th St NW, Suite 201
+Washington, DC 20010-2478
+(38.929635, -77.033658)","3100 14th St NW, Suite 201",3100 14th St NW,Suite 201,Washington,DC,20010-2478,US,"(38.929635, -77.033658)",38.929635,-77.033658,8/5/22 19:36,535,190,120
+ATT,7435,19th & K Street,Company Owned,16021,"1900 K St NW, Ste 105
+Washington, DC 20006-1110
+(38.893253, -77.04538)","1900 K St NW, Ste 105",1900 K St NW,Ste 105,Washington,DC,20006-1110,US,"(38.893253, -77.04538)",38.893253,-77.04538,8/6/22 12:21,34,190,120
+ATT,75238,George Washington Univ Hospital,Licensed,11371,"900 23rd St NW
+Washington, DC 20037-2342
+(38.901375, -77.050591)",900 23rd St NW,900 23rd St NW,,Washington,DC,20037-2342,US,"(38.901375, -77.050591)",38.901375,-77.050591,8/7/22 5:07,43,190,120
+ATT,10229,24th & M Streets,Company Owned,7822,"2400 M Street NW
+Washington, DC 20037-1494
+(38.905129, -77.051826)",2400 M Street NW,2400 M Street NW,,Washington,DC,20037-1494,US,"(38.905129, -77.051826)",38.905129,-77.051826,8/7/22 21:52,432,190,120
+ATT,8076,Safeway-Washington #2892,Licensed,18786,"1100 4th ST SW
+Washington, DC 20024-4451
+(38.879328, -77.017567)",1100 4th ST SW,1100 4th ST SW,,Washington,DC,20024-4451,US,"(38.879328, -77.017567)",38.879328,-77.017567,8/8/22 14:38,54,190,120
+ATT,75425,The Catholic University of America,Licensed,17344,"620 MICHIGAN AVE NE
+Washington, DC 20064-0001
+(38.932704, -76.99942)",620 MICHIGAN AVE NE,620 MICHIGAN AVE NE,,Washington,DC,20064-0001,US,"(38.932704, -76.99942)",38.932704,-76.99942,8/9/22 7:23,90,190,120
+ATT,7892,Eastern Market,Company Owned,13883,"401 8th Street SE
+Washington, DC 20003-2833
+(38.88359, -76.995309)",401 8th Street SE,401 8th Street SE,,Washington,DC,20003-2833,US,"(38.88359, -76.995309)",38.88359,-76.995309,8/10/22 0:08,77,190,120
+ATT,90122,L'Enfant Plaza,Company Owned,68123,"470 L'Enfant Plaza East, SW, 812
+Washington, DC 20024
+(38.877487, -77.019889)","470 L'Enfant Plaza East, SW, 812","470 L'Enfant Plaza East, SW",812,Washington,DC,20024,US,"(38.877487, -77.019889)",38.877487,-77.019889,8/10/22 16:54,66,190,120
+ATT,74866,Safeway-Washington #4270,Licensed,14646,"1601 Maryland Ave NE
+Washington, DC 20002-7606
+(38.90056, -76.97944)",1601 Maryland Ave NE,1601 Maryland Ave NE,,Washington,DC,20002-7606,US,"(38.90056, -76.97944)",38.90056,-76.97944,8/11/22 9:39,99,190,120
+ATT,10898,Navy Yard,Company Owned,6750,"1200 New Jersey Ave., SE
+Washington, DC 20590-0001
+(38.876207, -77.003603)","1200 New Jersey Ave., SE","1200 New Jersey Ave., SE",,Washington,DC,20590-0001,US,"(38.876207, -77.003603)",38.876207,-77.003603,8/12/22 2:24,111,190,120
+ATT,13641,Washington Harbour,Company Owned,7045,"3050 K Street
+Washington, DC 20007-5108
+(38.902277, -77.060241)",3050 K Street,3050 K Street,,Washington,DC,20007-5108,US,"(38.902277, -77.060241)",38.902277,-77.060241,8/12/22 19:10,77,190,120
+ATT,74837,Safeway - Washington #4205,Licensed,14604,"490 14th St SE
+Washington, DC 20003-3002
+(38.883529, -76.98651)",490 14th St SE,490 14th St SE,,Washington,DC,20003-3002,US,"(38.883529, -76.98651)",38.883529,-76.98651,8/13/22 11:55,290,190,120
+ATT,7237,3122 M Street,Company Owned,16679,"3122 M St NW
+Washington, DC 20007-3704
+(38.905063, -77.061918)",3122 M St NW,3122 M St NW,,Washington,DC,20007-3704,US,"(38.905063, -77.061918)",38.905063,-77.061918,8/14/22 4:41,90,190,120
+ATT,7762,National Zoo,Company Owned,11387,"3000 Connecticut Avenue NW, Space A &amp; B
+Washington, DC 20008-2509
+(38.929592, -77.055327)","3000 Connecticut Avenue NW, Space A & B",3000 Connecticut Avenue NW,Space A & B,Washington,DC,20008-2509,US,"(38.929592, -77.055327)",38.929592,-77.055327,8/14/22 21:26,90,190,120
+ATT,7172,Safeway-Georgetown #2912,Licensed,18794,"1855 Wisconsin Ave NW
+Washington, DC 20007-2302
+(38.990455, -77.067406)",1855 Wisconsin Ave NW,1855 Wisconsin Ave NW,,Washington,DC,20007-2302,US,"(38.990455, -77.067406)",38.990455,-77.067406,8/15/22 14:11,90,30,120
+ATT,722,Georgetown DC,Company Owned,8805,"1810 Wisconsin Avenue NW
+Washington, DC 20007-2301
+(38.990034, -77.067529)",1810 Wisconsin Avenue NW,1810 Wisconsin Avenue NW,,Washington,DC,20007-2301,US,"(38.990034, -77.067529)",38.990034,-77.067529,8/16/22 6:57,90,0,120
+ATT,7632,2300 Wisconsin Ave.,Company Owned,11059,"2302 Wisconsin Ave NW
+Washington, DC 20007-1843
+(38.920134, -77.071734)",2302 Wisconsin Ave NW,2302 Wisconsin Ave NW,,Washington,DC,20007-1843,US,"(38.920134, -77.071734)",38.920134,-77.071734,8/16/22 23:42,90,45,120
+ATT,70302,Georgetown University - Leavey Cent,Licensed,10977,"3800 Reservoir Road
+Washington, DC 20007-2113
+(38.910207, -77.074706)",3800 Reservoir Road,3800 Reservoir Road,,Washington,DC,20007-2113,US,"(38.910207, -77.074706)",38.910207,-77.074706,8/17/22 16:28,90,69,120
+ATT,13235,Van Ness,Company Owned,18078,"4250 Connecticut Ave., NW
+Washington, DC 20008-1907
+(38.944498, -77.064207)","4250 Connecticut Ave., NW","4250 Connecticut Ave., NW",,Washington,DC,20008-1907,US,"(38.944498, -77.064207)",38.944498,-77.064207,8/18/22 9:13,90,100,120
+ATT,72453,DCA - Wash Nat'l-Reagan-Level 1,Licensed,13186,"1 Aviation Cir
+Washington, DC 20001-6000
+(38.85731, -77.04426)",1 Aviation Cir,1 Aviation Cir,,Washington,DC,20001-6000,US,"(38.85731, -77.04426)",38.85731,-77.04426,8/19/22 1:58,90,243,120
+ATT,7572,Foxhall Square,Company Owned,18533,"3301 New Mexico Ave. NW
+Washington, DC 20016-3622
+(38.933575, -77.085644)",3301 New Mexico Ave. NW,3301 New Mexico Ave. NW,,Washington,DC,20016-3622,US,"(38.933575, -77.085644)",38.933575,-77.085644,8/19/22 18:44,90,123,120
+ATT,74903,Safeway-Wash DC #1276,Licensed,8942,"6500 Piney Branch Rd NW
+Washington, DC 20012-2900
+(38.969353, -77.026259)",6500 Piney Branch Rd NW,6500 Piney Branch Rd NW,,Washington,DC,20012-2900,US,"(38.969353, -77.026259)",38.969353,-77.026259,8/20/22 11:29,90,0,120
+ATT,3716,Safeway - Washington #693,Licensed,10729,"4865 MacArthur Blvd NW
+Washington, DC 20007-9077
+(38.917236, -77.096057)",4865 MacArthur Blvd NW,4865 MacArthur Blvd NW,,Washington,DC,20007-9077,US,"(38.917236, -77.096057)",38.917236,-77.096057,8/21/22 4:14,90,52,120
+ATT,74453,Safeway-Wash DC #1445,Licensed,13772,"2845 Alabama Ave SE
+Washington, DC 20020-3000
+(38.85906, -76.966837)",2845 Alabama Ave SE,2845 Alabama Ave SE,,Washington,DC,20020-3000,US,"(38.85906, -76.966837)",38.85906,-76.966837,8/21/22 21:00,90,111,120
+ATT,7490,4513 Wisconsin Ave./Tenley,Company Owned,13512,"4513 Wisconsin Avenue NW
+Washington, DC 20016-4619
+(38.948338, -77.079588)",4513 Wisconsin Avenue NW,4513 Wisconsin Avenue NW,,Washington,DC,20016-4619,US,"(38.948338, -77.079588)",38.948338,-77.079588,8/22/22 13:45,90,21,120
+ATT,7350,5185 MacArthur Blvd.,Company Owned,9363,"5185 MacArthur Blvd, Ste 104
+Washington, DC 20016-3341
+(38.926741, -77.102768)","5185 MacArthur Blvd, Ste 104",5185 MacArthur Blvd,Ste 104,Washington,DC,20016-3341,US,"(38.926741, -77.102768)",38.926741,-77.102768,8/23/22 6:31,90,99,120
+ATT,70055,Bolling AFB - Commissary Mall,Licensed,10987,"185 Chappie James Blvd SW
+Bolling AFB, DC 20032-7717
+(38.836376, -77.019690)",185 Chappie James Blvd SW,185 Chappie James Blvd SW,,Bolling AFB,DC,20032-7717,US,"(38.836376, -77.019690)",38.836376,-77.01969,8/23/22 23:16,90,234,120
+ATT,790,Chevy Chase Circle,Company Owned,12110,"5500 Connecticut Avenue
+Washington, DC 20090-2602
+(38.963242, -77.074889)",5500 Connecticut Avenue,5500 Connecticut Avenue,,Washington,DC,20090-2602,US,"(38.963242, -77.074889)",38.963242,-77.074889,8/24/22 16:01,90,321,120
+ATT,723,Spring Valley,Company Owned,11429,"4820 Massachusetts Ave. NW
+Washington, DC 20016-2066
+(38.944666, -77.095654)",4820 Massachusetts Ave. NW,4820 Massachusetts Ave. NW,,Washington,DC,20016-2066,US,"(38.944666, -77.095654)",38.944666,-77.095654,8/25/22 8:47,90,12,120
+ATT,7299,Chevy Chase Pavillion,Company Owned,16086,"5335 Wisconsin Ave NW, #37
+Washington, DC 20090-2030
+(38.960381, -77.084811)","5335 Wisconsin Ave NW, #37",5335 Wisconsin Ave NW,#37,Washington,DC,20090-2030,US,"(38.960381, -77.084811)",38.960381,-77.084811,8/26/22 1:32,90,44,120
