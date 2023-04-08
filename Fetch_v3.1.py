@@ -47,7 +47,7 @@ m = st.markdown("""
 #This removes Streamlit default settings icons
 hide_streamlit_style = """
             <style>
-            #MainMenu {visibility: hidden;}
+            #MainMenu {visibility: visible;}
             footer {visibility: hidden;}
             </style>
             """
