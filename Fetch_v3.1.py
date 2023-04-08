@@ -621,7 +621,7 @@ def declutterer(in_df, date_column):
 ####    Main Page   ####
 notices = st.empty()            #   Places notifications at the top of the screen
 filename = st.text_input(":red[Provide Map Name*]",)
-uploaded_file = st.file_uploader("Choose a CSV, TXT (Comma Seperated), TSV, or Excel file", type=["csv","txt","tsv","xlsx","xls"], accept_multiple_files=False)
+uploaded_file = st.file_uploader("Choose a CSV, TXT (Comma Seperated), TSV, or Excel file - Latitude & Longitude Columns must be present", type=["csv","txt","tsv","xlsx","xls"], accept_multiple_files=False)
 
 if uploaded_file != None:
     with st.expander("Manage Ingested Data"):
