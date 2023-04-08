@@ -1,11 +1,5 @@
 #Python3
 
-#This program creates geofence data based on user input and plotting locations provided in CSV, TSV, and Excel formats
-
-#   TO DO - time slider is not updated when picking dates w calendar, declutter
-#           remove export button from inside of maps that exports geojson files
-#           support parsing KML as input
-
 import simplekml #the library used to map longitudes and latitudes on google earth
 import pandas #used to read spreadsheet data
 import re
