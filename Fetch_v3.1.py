@@ -1,5 +1,13 @@
 #Python3
 
+#This program creates geofence data based on user input and plotting locations provided in CSV, TSV, and Excel formats
+
+#   TO DO - Time slider is not updated when picking dates w calendar, declutter
+#           Remove export button from inside of maps that exports geojson files
+#           Support parsing KML as input
+#           Add time filter support to cell site maps
+#           Add details to cell site sector wedges
+
 import simplekml #the library used to map longitudes and latitudes on google earth
 import pandas #used to read spreadsheet data
 import re
@@ -264,7 +272,7 @@ def make_map(in_df):       #bring in pandas dataframe
         gdf.geometry = gdf["GEOMETRY"]
         st.markdown("---")
 
-        col1, col2, col3,col4 = st.columns(4)
+        col1, col2, col3, col4 = st.columns(4)
         with col1:
             wedge_color = st.selectbox("Sector Color", options=['Red', 'Blue', 'Green', 'Purple', 'Orange', 'DarkRed', 'Beige', 'DarkBlue', 'DarkGreen', 'CadetBlue', 'Pink', 'LightBlue', 'LightGreen', 'Gray', 'Black', 'LightGray'])
         with col2:
@@ -319,7 +327,9 @@ def make_map(in_df):       #bring in pandas dataframe
     
     col1, col2, col3, col4, col5 = st.columns(5)
     with col1:
-        sav_HTML = st.button("Export to HTML")
+        # sav_HTML = st.button("Export to HTML")  # for use with local save of HTML
+        downloadfile = Map.to_html()               # for downloads
+        download_test = st.download_button(label="Download HTML Map", data=downloadfile,file_name="Fetch_Analysis_Map.html")
     with col2:
         print("")
     with col3:
@@ -328,17 +338,17 @@ def make_map(in_df):       #bring in pandas dataframe
         print("")
     with col5:
         print("")
-    if sav_HTML == True:
-        if len(filename) == 0:
-            st.error("Provide a map name above")
-        else:
-            try:
-                sav_location = HTML_output_file(filename)
-                Map.to_html(sav_location)
-                with notices:
-                    st.success("HTML file has been stored to: " + sav_location)
-            except TypeError:
-                print("woot")
+    # if sav_HTML == True:          # for use with local file saves
+    #     if len(filename) == 0:
+    #         st.error("Provide a map name above")
+    #     else:
+    #         try:
+    #             sav_location = HTML_output_file(filename)
+    #             Map.to_html(sav_location)
+    #             with notices:
+    #                 st.success("HTML file has been stored to: " + sav_location)
+    #         except TypeError:
+    #             print("woot")
         
 def get_footprint_color(icon_Color):
     if "Yellow" in icon_Color:
@@ -486,53 +496,56 @@ def create_kml(df_in, outfile):
         # except KeyError:
         #     print("There was a keyerror")
 
-            kml.save(outfile) # To save kml file to use in google earth use:
-            with notices:
-                st.success("KML file has been stored to: " + outfile)
+            download_kml = kml.kml(format=True)
+            download_button_kml = st.download_button("Download KML", data=download_kml, file_name="Fetch_KML_Download.kml")
 
-def cell_site(in_df):
-    gdf = geopandas.GeoDataFrame(in_df, geometry=geopandas.points_from_xy(in_df.LONGITUDE, in_df.LATITUDE))
-    gdf.columns = gdf.columns.str.upper()
-    gdf.geometry = gdf["GEOMETRY"]
-    col1, col2, col3,col4,col5 = st.columns(5)
-    with col1:
-        Lat = st.selectbox("Latitude", options=in_df.columns)
-    with col2:
-        Long = st.selectbox("Longitude", options=in_df.columns)
-    with col3:
-        radii = st.selectbox("Radius", options=in_df.columns)
-    with col4:
-        Azimuth = st.selectbox("Azimuth", options=in_df.columns)
-    with col5:
-        beam_width = st.selectbox("Beam Width", options=in_df.columns)
+            # kml.save(outfile) # To save kml file to use in google earth use:      # to save KML local
+            # with notices:
+            #     st.success("KML file has been stored to: " + outfile)
 
-    Map = leafmap.Map()
-    Map.zoom_to_gdf(gdf)
-    Map.add_basemap(basemap='ROADMAP')
-    Map.add_basemap(basemap='SATELLITE')
-    Map.add_basemap(basemap='TERRAIN')
-    Map.add_basemap(basemap='HYBRID')
-    Map.add_basemap(basemap='CartoDB.Positron')
-    Map.add_basemap(basemap="CartoDB.DarkMatter")
+# def cell_site(in_df):
+#     gdf = geopandas.GeoDataFrame(in_df, geometry=geopandas.points_from_xy(in_df.LONGITUDE, in_df.LATITUDE))
+#     gdf.columns = gdf.columns.str.upper()
+#     gdf.geometry = gdf["GEOMETRY"]
+#     col1, col2, col3,col4,col5 = st.columns(5)
+#     with col1:
+#         Lat = st.selectbox("Latitude", options=in_df.columns)
+#     with col2:
+#         Long = st.selectbox("Longitude", options=in_df.columns)
+#     with col3:
+#         radii = st.selectbox("Radius", options=in_df.columns)
+#     with col4:
+#         Azimuth = st.selectbox("Azimuth", options=in_df.columns)
+#     with col5:
+#         beam_width = st.selectbox("Beam Width", options=in_df.columns)
+
+#     Map = leafmap.Map()
+#     Map.zoom_to_gdf(gdf)
+#     Map.add_basemap(basemap='ROADMAP')
+#     Map.add_basemap(basemap='SATELLITE')
+#     Map.add_basemap(basemap='TERRAIN')
+#     Map.add_basemap(basemap='HYBRID')
+#     Map.add_basemap(basemap='CartoDB.Positron')
+#     Map.add_basemap(basemap="CartoDB.DarkMatter")
     
-    # _Points = Map.add_circle_markers_from_xy(gdf, x="LONGITUDE", y="LATITUDE", radius=5)
+#     # _Points = Map.add_circle_markers_from_xy(gdf, x="LONGITUDE", y="LATITUDE", radius=5)
 
-    for index, row in gdf.iterrows():
-        print(row["LATITUDE"],row["LONGITUDE"])
-        plugins.SemiCircle((row["LATITUDE"],row["LONGITUDE"]),
-        radius=row[radii],
-        direction=row[Azimuth],
-        arc=row[beam_width],
-        color="darkred",
-        fill_color="darkred",
-        opacity=1,
-        popup="Direction - 0 degrees, arc 90 degrees",
-        ).add_to(Map)
-    Map.to_streamlit()
-    cell2html = st.button("Cell Map to HTML")
-    if cell2html == True:
-        sav_location = HTML_output_file(filename)
-        Map.to_html(sav_location)
+#     for index, row in gdf.iterrows():
+#         print(row["LATITUDE"],row["LONGITUDE"])
+#         plugins.SemiCircle((row["LATITUDE"],row["LONGITUDE"]),
+#         radius=row[radii],
+#         direction=row[Azimuth],
+#         arc=row[beam_width],
+#         color="darkred",
+#         fill_color="darkred",
+#         opacity=1,
+#         popup="Direction - 0 degrees, arc 90 degrees",
+#         ).add_to(Map)
+#     Map.to_streamlit()
+#     cell2html = st.button("Cell Map to HTML")     # for local saves of HTML
+#     if cell2html == True:
+#         sav_location = HTML_output_file(filename)
+#         Map.to_html(sav_location)
         
 def time_range_slider(in_df):
  ## Range selector
@@ -621,7 +634,7 @@ def declutterer(in_df, date_column):
 ####    Main Page   ####
 notices = st.empty()            #   Places notifications at the top of the screen
 filename = st.text_input(":red[Provide Map Name*]",)
-uploaded_file = st.file_uploader("Choose a CSV, TXT (Comma Seperated), TSV, or Excel file - Latitude & Longitude Columns must be present", type=["csv","txt","tsv","xlsx","xls"], accept_multiple_files=False)
+uploaded_file = st.file_uploader("Choose a CSV, TXT (Comma Seperated), TSV, or Excel file", type=["csv","txt","tsv","xlsx","xls"], accept_multiple_files=False)
 
 if uploaded_file != None:
     with st.expander("Manage Ingested Data"):
