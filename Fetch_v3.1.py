@@ -177,9 +177,11 @@ def make_geofence_map():
                 lon, lat = coord[0], coord[1]
                 text_of_coords = text_of_coords + "\n" + (str(lat) + ", " + str(lon)) + "\n"
         texting = st.write(text_of_coords)
-        copy_dis = st.button("Copy to Clipboard")
-        if copy_dis == True:
-            pyperclip.copy(text_of_coords)
+        download_coords = st.download_button(label="Download Coordinates", data=text_of_coords, file_name="Fetch_GeoFence_Coordinates.txt")
+
+        # copy_dis = st.button("Copy to Clipboard")     # for local use only
+        # if copy_dis == True:
+        #     pyperclip.copy(text_of_coords)
         
     except TypeError:
         # print("no data to populate - add some data")
