@@ -2,16 +2,11 @@ A tool to help investigators convert raw data into actionable maps.
 
 # Version 3 is here!
 
+Try out the web app: https://northloopforensics-fetch-fetch-v3-1-56snz1.streamlit.app
 
 ![alt text](https://user-images.githubusercontent.com/73806121/228633379-85d9099e-33b9-4ccf-841f-9f012e994a85.png)
 
 ### Here is how it works:
-Run the installer executable for Windows.
-Fetch will be added to your Start Menu. The first run of the program will launch a small web server in the background that will prompt for permission to run.  Occasionally, a system reboot is needed to run the program. 
-
-![alt text](https://user-images.githubusercontent.com/73806121/228640870-cfb2cb6e-9855-4c00-8890-f83359621282.png)
-
-A browser tab will then open to Fetch.
 
 As the tool opens you may generate a geo-fence by drawing shapes on the provided map to collect coordinates. Simply close the shape you are drawing to see the latitude and longitude for each point you create. 
 
