@@ -16,7 +16,7 @@ OR  You can provide a data set and generate your own maps.
 
 ![alt text](https://user-images.githubusercontent.com/73806121/228634875-80765455-a23b-48a2-abe7-80dc9c930c8b.png)
 
-If the CSV is correctly configured you will see a preview map. If not, the collapsable Manage Ingested Data window allows you to select the number of header lines to remove, filter for specific time frames, and average/consolidate points for a time interval (ex. 1 point every 5 minutes).  **The CSV file MUST contain columns labeled "Latitude" and "Longitude".**
+If the input file is correctly configured you will see a preview map. If not, the collapsable Manage Ingested Data window allows you to select the number of header lines to remove, filter for specific time frames, and average/consolidate points for a time interval (ex. 1 point every 5 minutes).  **The input file MUST contain columns labeled "Latitude" and "Longitude".**
 
 ![alt text](https://user-images.githubusercontent.com/73806121/228635721-460059b3-dab4-4f1f-b652-6c9f586df7ab.png)
 
