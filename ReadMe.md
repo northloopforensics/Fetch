@@ -36,7 +36,7 @@ Below image is Google Earth output.
 
 ![alt text](https://user-images.githubusercontent.com/73806121/216791825-56539e9d-67fc-483c-b8b7-1052e5805f0b.png)
 
-Exported KML and HTML maps will be stored in username/Documents/Fetch_Maps/
+KML and HTML maps can be downloaded for later use.
 
 ![alt text](https://user-images.githubusercontent.com/73806121/228637714-52c48ce7-6400-491c-a58e-7cd537fcab3d.png)
 
