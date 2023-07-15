@@ -715,7 +715,7 @@ if uploaded_file != None:
             st.map(preview_data)
         except TypeError:
             st.error("Ensure you have correct settings in Manage CSV and Date/Time Filtering")
-        filename = st.text_input(":red[Provide Map Name*]",)    
+        # filename = st.text_input(":red[Provide Map Name*]",)    
         icon = st.selectbox("Select Map Point Icon Style", options=icon_options)
         footprint = st.checkbox("Dataset includes radius/area information",)
         
