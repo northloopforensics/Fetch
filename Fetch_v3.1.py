@@ -467,6 +467,7 @@ def create_kml(df_in, outfile):
         print("Attribute error on variable headers in createkml")
         st.error("Check for errors in column selection.")
     if KML == True:
+        filename = "MITE_KML_Map" + str(now)
         if len(filename) == 0:
             with notices:
                 st.error("Map Name Required")
