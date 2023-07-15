@@ -26,6 +26,8 @@ from streamlit_folium import st_folium          #   used to create geofences
 import pyperclip                        #   copies geofence coordinates to clipboard
 import datetime
 import geocoder                         #   search bar for geofence, api calls for address and ip lookups
+import gpxpy
+
 
 st.set_page_config(
    page_title="Fetch v3.1",
@@ -69,7 +71,7 @@ selected_icon = {'Square' :'http://maps.google.com/mapfiles/kml/shapes/placemark
 
 ####    Functions Live Here     ######
 
-def get_point_at_distance(lat1, lon1, d, bearing, R=6371):
+def get_point_at_distance(lat1, lon1, d, bearing, R=6371):  # used to draw tower wedges
     """
     lat: initial latitude, in degrees
     lon: initial longitude, in degrees
@@ -102,7 +104,8 @@ def make_geofence_map():
         THEY INDICATE A GENERAL AREA ASSOCIATED WITH THE SERVICE PROVIDER AND MAY BE COMPLETELY INACCURATE IN SOME INSTANCES. \n\nVerify 
         any addresses or locations presented by the search bar. \n\nAccuracy varies based on location.""")
     global geomap
-    geomap = folium.Map(zoom_start=4)
+    geomap = folium.Map(zoom_start=14)
+    geomap.fit_bounds([[27,-140],[48,-59]])
     Draw(export=True,draw_options=({'circle': False,'circlemarker':False, 'marker':False})).add_to(geomap)
     folium.TileLayer(tiles = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     attr = 'Esri',
@@ -410,6 +413,23 @@ def make_dataframe(infile, outfile):       #   changes input file to pandas data
         except UnicodeError:
             st.error("Decoding error. Try another encoding method.")
             pass
+
+    elif (".gpx") in str(infile):
+        with open(infile) as f:
+            gpx = gpxpy.parse(f)
+            # Convert to a dataframe one point at a time.
+            points = []
+            for segment in gpx.tracks[0].segments:
+                for p in segment.points:
+                    points.append({
+                        'time': p.time,
+                        'latitude': p.latitude,
+                        'longitude': p.longitude,
+                        'elevation': p.elevation,
+                    })
+            dataf = pandas.DataFrame.from_records(points)
+
+
     n = lines_t0_remove
     if n > 0:
         dataf.columns = dataf.iloc[n-1]   
@@ -636,7 +656,7 @@ def declutterer(in_df, date_column):
 ####    Main Page   ####
 notices = st.empty()            #   Places notifications at the top of the screen
 filename = st.text_input(":red[Provide Map Name*]",)
-uploaded_file = st.file_uploader("Choose a CSV, TXT (Comma Seperated), TSV, or Excel file", type=["csv","txt","tsv","xlsx","xls"], accept_multiple_files=False)
+uploaded_file = st.file_uploader("Choose a CSV, TXT (Comma Seperated), TSV, Excel, or GPX file", type=["csv","txt","tsv","xlsx","xls","gpx"], accept_multiple_files=False)
 
 if uploaded_file != None:
     with st.expander("Manage Ingested Data"):
