@@ -676,6 +676,7 @@ if uploaded_file != None:
                 if encode_options == "Use Manual Encoding Selection":       
                     selected_encoding = st.selectbox("Choose File Encoding",options=["utf-8", 'utf-8-sig', 'utf-16', 'ISO-8859-1'])
                 uploaded_file.seek(0)       #refresh action
+                filename = st.text_input(":red[Provide Map Name*]",)
                 outFile = KML_output_file(filename)
                 # print(outFile)
                 get_headings, preview_data = make_dataframe(uploaded_file, outfile=outFile)
