@@ -664,6 +664,7 @@ notices = st.empty()            #   Places notifications at the top of the scree
 uploaded_file = st.file_uploader("Choose a CSV, TXT (Comma Seperated), TSV, Excel, or GPX file", type=["csv","txt","tsv","xlsx","xls","gpx"], accept_multiple_files=False)
 
 if uploaded_file != None:
+    filename = st.text_input(":red[Provide Map Name*]",)
     with st.expander("Manage Ingested Data"):
         tabi, tabii, tabiii = st.tabs(["Review Ingest Data", "Time Filter", "Declutter"])
         with tabi:
@@ -676,7 +677,7 @@ if uploaded_file != None:
                 if encode_options == "Use Manual Encoding Selection":       
                     selected_encoding = st.selectbox("Choose File Encoding",options=["utf-8", 'utf-8-sig', 'utf-16', 'ISO-8859-1'])
                 uploaded_file.seek(0)       #refresh action
-                # outFile = KML_output_file(filename)
+                outFile = KML_output_file(filename)
                 # print(outFile)
                 get_headings, preview_data = make_dataframe(uploaded_file, outfile=outFile)
 
@@ -714,11 +715,10 @@ if uploaded_file != None:
             st.map(preview_data)
         except TypeError:
             st.error("Ensure you have correct settings in Manage CSV and Date/Time Filtering")  
-        filename = st.text_input(":red[Provide Map Name*]",)
  
         icon = st.selectbox("Select Map Point Icon Style", options=icon_options)
         footprint = st.checkbox("Dataset includes radius/area information",)
-        outFile = KML_output_file(filename)
+        
 
         KML = st.button("GENERATE KML")
         st.markdown("---")
