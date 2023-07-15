@@ -676,8 +676,7 @@ if uploaded_file != None:
                 if encode_options == "Use Manual Encoding Selection":       
                     selected_encoding = st.selectbox("Choose File Encoding",options=["utf-8", 'utf-8-sig', 'utf-16', 'ISO-8859-1'])
                 uploaded_file.seek(0)       #refresh action
-                filename = st.text_input(":red[Provide Map Name*]",)
-                outFile = KML_output_file(filename)
+                # outFile = KML_output_file(filename)
                 # print(outFile)
                 get_headings, preview_data = make_dataframe(uploaded_file, outfile=outFile)
 
@@ -714,11 +713,13 @@ if uploaded_file != None:
         try:
             st.map(preview_data)
         except TypeError:
-            st.error("Ensure you have correct settings in Manage CSV and Date/Time Filtering")
-        # filename = st.text_input(":red[Provide Map Name*]",)    
+            st.error("Ensure you have correct settings in Manage CSV and Date/Time Filtering")  
+        filename = st.text_input(":red[Provide Map Name*]",)
+ 
         icon = st.selectbox("Select Map Point Icon Style", options=icon_options)
         footprint = st.checkbox("Dataset includes radius/area information",)
-        
+        outFile = KML_output_file(filename)
+
         KML = st.button("GENERATE KML")
         st.markdown("---")
         create_kml(df_in=preview_data,outfile=outFile)
