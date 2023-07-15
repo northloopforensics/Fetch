@@ -415,8 +415,8 @@ def make_dataframe(infile, outfile):       #   changes input file to pandas data
             pass
 
     elif (".gpx") in str(infile):
-        with open(infile, 'r') as f:
-            gpx = gpxpy.parse(f)
+        # with open(infile, 'r') as f:
+        gpx = gpxpy.parse(infile)
         # Convert to a dataframe one point at a time.
         points_data = []
         # Loop through all points in all track segments
