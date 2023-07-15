@@ -415,19 +415,24 @@ def make_dataframe(infile, outfile):       #   changes input file to pandas data
             pass
 
     elif (".gpx") in str(infile):
-        with open(infile) as f:
+        with open(infile, 'r') as f:
             gpx = gpxpy.parse(f)
         # Convert to a dataframe one point at a time.
-        points = []
-        for segment in gpx.tracks[0].segments:
-            for p in segment.points:
-                points.append({
-                    'time': p.time,
-                    'latitude': p.latitude,
-                    'longitude': p.longitude,
-                    'elevation': p.elevation,
-                })
-        dataf = pandas.DataFrame.from_records(points)
+        points_data = []
+        # Loop through all points in all track segments
+        for track in gpx.tracks:
+            for segment in track.segments:
+                for point in segment.points:
+                    # Create a dictionary to store the latitude, longitude, elevation, and time values for the point
+                    point_data = {
+                        'latitude': point.latitude,
+                        'longitude': point.longitude,
+                        'elevation': point.elevation,
+                        'time': point.time
+                    }
+                    # Append the dictionary to the list
+                    points_data.append(point_data)
+        dataf = pandas.DataFrame.from_records(points_data)
 
 
     n = lines_t0_remove
