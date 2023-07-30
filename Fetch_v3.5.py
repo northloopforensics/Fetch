@@ -257,19 +257,23 @@ def make_IPaddress_Map():   #used to map ips
         gdf = geopandas.GeoDataFrame(cleandf, geometry=geopandas.points_from_xy(cleandf.LONGITUDE, cleandf.LATITUDE))
         try:
             user_gdf = pandas.json_normalize(search_latlng)
-        Exception NotImplementedError:
+        except NotImplementedError:
             st.info("No user location provided. Mapping IPs.")
-        user_gdf = geopandas.GeoDataFrame(user_gdf, geometry=geopandas.points_from_xy(user_gdf.lng, user_gdf.lat))
-        # print(gdf)
+        try:
+            user_gdf = geopandas.GeoDataFrame(user_gdf, geometry=geopandas.points_from_xy(user_gdf.lng, user_gdf.lat))
+        except UnboundLocalError:
+            pass
         ipmap = leafmap.Map(zoom=2)    
         ipmap.add_basemap(basemap='ROADMAP')
         ipmap.add_basemap(basemap='TERRAIN')
         ipmap.add_basemap(basemap='HYBRID')
         # ipmap.add_basemap(basemap="CartoDB.DarkMatter") 
-        color = st.selectbox(label="Choose",options=[ 'Yellow','DarkRed','Pink', 'Green', 'Teal', "Blue", "White"])
         # ipmap.zoom_to_gdf(gdf) 
-        user_spot = ipmap.add_circle_markers_from_xy(data=user_gdf, x="lng", y="lat",color='Red',fill_color="White")
-        circle_Points = ipmap.add_circle_markers_from_xy(data=gdf, x="LONGITUDE", y="LATITUDE",color=color,fill_color=color, radius=5)
+        try:
+            user_spot = ipmap.add_circle_markers_from_xy(data=user_gdf, x="lng", y="lat",color='Red',fill_color="White")
+        except UnboundLocalError:
+            pass
+        circle_Points = ipmap.add_circle_markers_from_xy(data=gdf, x="LONGITUDE", y="LATITUDE",color="Yellow",fill_color="Yellow", radius=5)
         ipmap.to_streamlit()
         downloadfile = ipmap.to_html()               # for downloads
         download_test = st.download_button(label="Download HTML Map", data=downloadfile,file_name="Fetch_Analysis_Map.html")
