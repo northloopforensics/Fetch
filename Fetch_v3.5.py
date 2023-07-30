@@ -29,7 +29,7 @@ import gpxpy
 
 now = datetime.datetime.now()
 st.set_page_config(
-   page_title="Fetch v3.1",
+   page_title="Fetch v3.5",
    #page_icon="🔴",
    layout="wide",
    initial_sidebar_state="expanded",
