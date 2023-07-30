@@ -255,7 +255,10 @@ def make_IPaddress_Map():   #used to map ips
     
         print(cleandf)
         gdf = geopandas.GeoDataFrame(cleandf, geometry=geopandas.points_from_xy(cleandf.LONGITUDE, cleandf.LATITUDE))
-        user_gdf = pandas.json_normalize(search_latlng)
+        try:
+            user_gdf = pandas.json_normalize(search_latlng)
+        Exception NotImplementedError:
+            st.info("No user location provided. Mapping IPs.")
         user_gdf = geopandas.GeoDataFrame(user_gdf, geometry=geopandas.points_from_xy(user_gdf.lng, user_gdf.lat))
         # print(gdf)
         ipmap = leafmap.Map(zoom=2)    
