@@ -23,7 +23,6 @@ import folium                           #   maps
 from math import asin, atan2, cos, degrees, radians, sin    #   calculates shapes and polygons on sphere
 from folium.plugins import Draw, Geocoder       
 from streamlit_folium import st_folium          #   used to create geofences
-import pyperclip                        #   copies geofence coordinates to clipboard
 import datetime
 import geocoder                         #   search bar for geofence, api calls for address and ip lookups
 import gpxpy
@@ -68,6 +67,9 @@ get_headings = ""
 selected_encoding = ""
 icon_options = ["Yellow Paddle", "Green Paddle", "Blue Paddle", "White Paddle", "Teal Paddle", "Red Paddle", "Yellow Pushpin", "White Pushpin", "Red Pushpin", "Square"]
 selected_icon = {'Square' :'http://maps.google.com/mapfiles/kml/shapes/placemark_square.png','Yellow Pushpin' : "http://maps.google.com/mapfiles/kml/pushpin/ylw-pushpin.png",'Red Pushpin' : "http://maps.google.com/mapfiles/kml/pushpin/red-pushpin.png",'White Pushpin' : "http://maps.google.com/mapfiles/kml/pushpin/wht-pushpin.png",'Red Paddle' : "http://maps.google.com/mapfiles/kml/paddle/red-circle.png",'Green Paddle' : "http://maps.google.com/mapfiles/kml/paddle/grn-circle.png",'Blue Paddle' : "http://maps.google.com/mapfiles/kml/paddle/blu-circle.png",'Teal Paddle' : "http://maps.google.com/mapfiles/kml/paddle/ltblu-circle.png",'Yellow Paddle' : "http://maps.google.com/mapfiles/kml/paddle/ylw-circle.png",'White Paddle' : "http://maps.google.com/mapfiles/kml/paddle/wht-circle.png"}
+invalid_ips = ['0', '10.', '127.0.0.1','172.16', '172.17', '172.18', '172.19', '172.2',  '172.21', '172.22', '172.23', '172.24', '172.25',
+            '172.26', '172.27', '172.28', '172.29', '172.30',  '172.31', '192.168', '169.254', "255.255" ,"fc00"]
+geo_list = []
 
 ####    Functions Live Here     ######
 
@@ -167,7 +169,7 @@ def make_geofence_map():
     # else:
     #     geomap = folium.Map(location=search_latlng,zoom_start=3) 
     
-    outputmap = st_folium(geomap, width=1500, height=500)
+    outputmap = st_folium(geomap, width=1500, height=900)
     
     try:        #   pulls the lats and longs from the returned JSON encoded map points
         parse1 = (outputmap['last_active_drawing'])
@@ -189,7 +191,88 @@ def make_geofence_map():
     except TypeError:
         # print("no data to populate - add some data")
         pass
-            
+
+def parse_text_for_IPs(text):  #used to map ips
+    ipv4_pattern = r'(?:\d{1,3}\.){3}\d{1,3}\b'
+    ipv6_pattern = r'(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))'
+
+    ipv4_addresses = re.findall(ipv4_pattern, text)
+    ipv6_addresses = re.findall(ipv6_pattern, text)
+    
+    ipv6_list = []
+    ip_list = list(set(ipv4_addresses))
+
+    for address in ipv6_addresses:
+        clean_ipv6 = [item for item in address if len(item) > 16]
+        if clean_ipv6:      # checks for empty lists
+            ipv6_list.append(clean_ipv6)
+    unique_ip6_list = [str(inner_list[0]) for inner_list in ipv6_list]
+    unique_ip6_list = list(set(unique_ip6_list))
+    ip_list.extend(unique_ip6_list)
+    return ip_list
+
+def get_IP_locale(invalidList, IPs):    #used to map ips
+    valid_only = [address for address in IPs if not any(address.startswith(inval) for inval in invalidList)] # removes invalid ips from list of bad ips
+    for thing in valid_only:
+        pull_geo_data = geocoder.ipinfo(thing)
+        geo_list.append(pull_geo_data.json)     # Saves data to list in global variable geo_list
+def geo_ip_to_Dataframe(geo_list):  #used to map ips
+    df = pandas.json_normalize(geo_list)
+    df = df.dropna(how='all') #removes entirely empty rows
+    columns = df.columns
+    columnnamelist = []
+    for name in columns:
+        columnnamelist.append(name.upper())
+    df.columns = columnnamelist
+    df.rename(columns={"IP": 'IP ADDRESS','LAT': 'LATITUDE', 'LNG': "LONGITUDE", 'ORG': "SERVICE PROVIDER"}, inplace=True)
+    return (df)
+
+def make_IPaddress_Map():   #used to map ips
+    # help_Box = st.expander(label="Help")
+    user_location = st.text_input("Place Name or Address - Use to Add a Relevant Location to the Map (Place e-mail received, point of comparison, etc)")
+    ipdata = st.text_area("Input Data with IP Addresses or an E-Mail Header",height=200)
+    ip_geo_button = st.button("Search")
+    # with help_Box:
+
+    if ip_geo_button == True:
+        # print(ipdata)
+        search_geo_results = geocoder.osm(user_location)
+        search_latlng = search_geo_results.json
+        print(search_latlng)
+        parsed_IPs = parse_text_for_IPs(ipdata)
+        get_IP_locale(invalid_ips, parsed_IPs)
+        datfram = geo_ip_to_Dataframe(geo_list=geo_list)    
+        
+        # print(geo_list)
+        # print(datfram)
+        show_these = ('IP ADDRESS', 'STATUS','SERVICE PROVIDER', 'CITY', 'STATE', 'COUNTRY','LATITUDE', 'LONGITUDE')
+        # show_these = None
+        st.dataframe(data=datfram,hide_index=True,column_order=show_these)    
+    
+        # try:
+        cleandf = pandas.DataFrame.dropna(datfram, subset=["LONGITUDE","LATITUDE"])
+        cleandf = cleandf.reset_index()
+    
+        print(cleandf)
+        gdf = geopandas.GeoDataFrame(cleandf, geometry=geopandas.points_from_xy(cleandf.LONGITUDE, cleandf.LATITUDE))
+        user_gdf = pandas.json_normalize(search_latlng)
+        user_gdf = geopandas.GeoDataFrame(user_gdf, geometry=geopandas.points_from_xy(user_gdf.lng, user_gdf.lat))
+        # print(gdf)
+        ipmap = leafmap.Map(zoom=2)    
+        ipmap.add_basemap(basemap='ROADMAP')
+        ipmap.add_basemap(basemap='TERRAIN')
+        ipmap.add_basemap(basemap='HYBRID')
+        # ipmap.add_basemap(basemap="CartoDB.DarkMatter") 
+        color = st.selectbox(label="Choose",options=[ 'Yellow','DarkRed','Pink', 'Green', 'Teal', "Blue", "White"])
+        # ipmap.zoom_to_gdf(gdf) 
+        user_spot = ipmap.add_circle_markers_from_xy(data=user_gdf, x="lng", y="lat",color='Red',fill_color="White")
+        circle_Points = ipmap.add_circle_markers_from_xy(data=gdf, x="LONGITUDE", y="LATITUDE",color=color,fill_color=color, radius=5)
+        ipmap.to_streamlit()
+        downloadfile = ipmap.to_html()               # for downloads
+        download_test = st.download_button(label="Download HTML Map", data=downloadfile,file_name="Fetch_Analysis_Map.html")
+        # except KeyError:
+        #     st.error("Input Data is required OR No location data was located from the provided data.")
+
 def make_map(in_df):       #bring in pandas dataframe
     gdf = geopandas.GeoDataFrame(in_df, geometry=geopandas.points_from_xy(in_df.LONGITUDE, in_df.LATITUDE))
     
@@ -703,9 +786,11 @@ if uploaded_file != None:
                     st.error("Select date/time column")
 
 if uploaded_file == None:
-    tabA, tabB = st.tabs(["Create Geofence", "Add a Data Set for More Functionality"])
+    tabA, tabB = st.tabs(["Create Geofence", "IP Address Mapping"])
     with tabA:
         make_geofence_map()
+    with tabB:
+        make_IPaddress_Map()
 
 if uploaded_file != None:
     if declutter_dis or filterbytime == True:
