@@ -23,7 +23,6 @@ import folium                           #   maps
 from math import asin, atan2, cos, degrees, radians, sin    #   calculates shapes and polygons on sphere
 from folium.plugins import Draw, Geocoder       
 from streamlit_folium import st_folium          #   used to create geofences
-import pyperclip                        #   copies geofence coordinates to clipboard
 import datetime
 import geocoder                         #   search bar for geofence, api calls for address and ip lookups
 
