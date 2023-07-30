@@ -2,7 +2,7 @@ A tool to help investigators convert raw data into actionable maps.
 
 # Version 3 is here!
 
-Try out the web app: https://northloopforensics-fetch-fetch-v3-1-56snz1.streamlit.app
+Try out the web app: https://northloopforensics-fetch-fetch-v3-5-vklwtp.streamlit.app/
 
 ![alt text](https://user-images.githubusercontent.com/73806121/228633379-85d9099e-33b9-4ccf-841f-9f012e994a85.png)
 
@@ -32,7 +32,7 @@ Remove map layers to access new helpful views.
 
 KML Map labels are assigned by selecting a column. Descriptions can be assigned to each location to provide additional information about that point. The data in that column will appear with map points on Google Earth.After making the appropriate selections for your data set, hit the Generate KML button.  
 
-Below image is Google Earth output.
+The below image is Google Earth output.
 
 ![alt text](https://user-images.githubusercontent.com/73806121/216791825-56539e9d-67fc-483c-b8b7-1052e5805f0b.png)
 
@@ -40,7 +40,16 @@ KML and HTML maps can be downloaded for later use.
 
 ![alt text](https://user-images.githubusercontent.com/73806121/228637714-52c48ce7-6400-491c-a58e-7cd537fcab3d.png)
 
-Below image is I.P. address query result using ipinfo.io
+The below image is an I.P. address query result using ipinfo.io on the Geofence page.
 
 ![alt text](https://user-images.githubusercontent.com/73806121/228654864-60173577-0cfc-4ab7-bcab-a8eabd65d764.png)
+
+Additional support for mapping IP addresses has been added in "IP Address Mapping" allowing batch IP address searches. The best part is you don't have to weed through e-mail headers or large data sets to find the IP addresses.  Fetch will locate IP addresses and remove local addresses like 10.0.0.1 or 127.0.0.1 to query the geographic area for public facing IPs. Add your own relevant location to perhaps indicate where a victim received an email.
+
+![alt text](https://github.com/northloopforensics/Fetch/assets/73806121/ff4c2a98-eb86-4b6c-ad9d-34aeeed25e5d)
+
+
+
+
+
 
