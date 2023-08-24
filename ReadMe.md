@@ -48,7 +48,7 @@ Additional support for mapping IP addresses has been added in "IP Address Mappin
 
 ![alt text](https://github.com/northloopforensics/Fetch/assets/73806121/ff4c2a98-eb86-4b6c-ad9d-34aeeed25e5d)
 
-
+Thanks to Jonathan Todd for contributions on GPX support!
 
 
 
