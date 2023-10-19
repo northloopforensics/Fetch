@@ -2,7 +2,7 @@ A tool to help investigators convert raw data into actionable maps.
 
 # Version 3 is here!
 
-Try out the web app: [https://northloopforensics-fetch-v3-6.streamlit.app]
+Try out the web app: https://northloopforensics-fetch-v3-6.streamlit.app
 
 ![alt text](https://user-images.githubusercontent.com/73806121/228633379-85d9099e-33b9-4ccf-841f-9f012e994a85.png)
 
