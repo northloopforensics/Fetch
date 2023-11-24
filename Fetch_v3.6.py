@@ -30,7 +30,7 @@ import numpy as np
 
 now = datetime.datetime.now()
 st.set_page_config(
-   page_title="Fetch v3.5",
+   page_title="Fetch v3.6",
    #page_icon="🔴",
    layout="wide",
    initial_sidebar_state="expanded",
@@ -365,32 +365,53 @@ def make_map(in_df):       #bring in pandas dataframe
         
     
     if map_Type == "Cell Sites":
-        Map.zoom_to_gdf(gdf) 
+        towermastpoint = Map.add_circle_markers_from_xy(data=gdf, x="LONGITUDE", y="LATITUDE",color='white',fill_color='white', radius=1)
 
         gdf.columns = gdf.columns.str.upper()
         gdf.geometry = gdf["GEOMETRY"]
+        Map.zoom_to_gdf(gdf) 
+        
         st.markdown("---")
 
         wedge_color = st.selectbox("Sector Color", options=['Red', 'Blue', 'Green', 'Purple', 'Orange', 'DarkRed', 'Beige', 'DarkBlue', 'DarkGreen', 'CadetBlue', 'Pink', 'LightBlue', 'LightGreen', 'Gray', 'Black', 'LightGray'])
-      
+    
         radii_list = ["1.5 Miles", "1 Kilometer"]
-        
         for oto in in_df.columns:
             radii_list.append(oto)
-          
         radii = st.selectbox("Sector Footprint Size", options=radii_list)
         if radii == "1.5 Miles":
             in_df["1.5 Miles"] = pandas.Series(2414 for x in range(len(in_df.index)))
         if radii == "1 Kilometer":
             in_df["1 Kilometer"] = pandas.Series(1000 for x in range(len(in_df.index)))
-    
-        Azimuth = st.selectbox("Sector Azimuth", options=in_df.columns)
-            
-        beam_width = st.selectbox("Sector Beam Width", options=in_df.columns)
-
+        Azimuth = st.selectbox("Sector Azimuth", options=in_df.columns)   
+        beam_width = st.selectbox("Sector Beam Width", options=in_df.columns, placeholder='None')
         try:
             for index, row in gdf.iterrows():           #   iterates through the data frame to place points,shapes
+               
+                # plugins.SemiCircle((row["LATITUDE"],row["LONGITUDE"]),      #wedge shape 
+                # radius=row[radii]/2,
+                # direction=row[Azimuth],
+                # arc=row[beam_width],
+                # color=None,
+                # fill_color=wedge_color,
+                # opacity=1,
+                # fill_opacity=.5,
+                # popup=('<br>'.join(f'{k}: {v}' for k, v in row.items()))).add_to(Map)
+
             
+                length = row[radii]/1000  #convert to meters
+                # print(length/1000)
+                half_beamwidth = int(row[beam_width]) / 2
+                upside =  (row[Azimuth] + half_beamwidth)  #calc angle from center of beam up
+                upside %= 360       # accomodates crossing 360 degree point
+                downside = (row[Azimuth] - half_beamwidth)  #calc angle from center of beam down
+                downside %= 360      # accomodates crossing 360 degree point
+                # print("AZ- "+str(row[Azimuth]) + " up-" + str(upside) + " down-" + str(downside))
+            
+                up_lat, up_lon = get_point_at_distance(row["LATITUDE"], row["LONGITUDE"],d=length,bearing=upside)
+                dwn_lat, dwn_lon = get_point_at_distance(row["LATITUDE"], row["LONGITUDE"],d=length,bearing=downside)
+                leafmap.folium.PolyLine([[row["LATITUDE"],row["LONGITUDE"]], [up_lat,up_lon]],color=wedge_color).add_to(Map)    # lines for exterior wedge shape
+                leafmap.folium.PolyLine([[row["LATITUDE"],row["LONGITUDE"]], [dwn_lat,dwn_lon]],color=wedge_color).add_to(Map)
                 plugins.SemiCircle((row["LATITUDE"],row["LONGITUDE"]),      #wedge shape 
                 radius=row[radii]/2,
                 direction=row[Azimuth],
@@ -399,33 +420,18 @@ def make_map(in_df):       #bring in pandas dataframe
                 fill_color=wedge_color,
                 opacity=1,
                 fill_opacity=.5,
-                # popup="Azimuth - " + str(row[Azimuth]) + " degrees, Beam width - " + str(row[beam_width]) + " degrees",).add_to(Map)
-
                 popup=('<br>'.join(f'{k}: {v}' for k, v in row.items()))).add_to(Map)
-
-                length = row[radii]/1000  #convert to meters
-                # print(length/1000)
-                half_beamwidth = row[beam_width] / 2
-                upside =  (row[Azimuth] + half_beamwidth)  #calc angle from center of beam up
-                upside %= 360       # accomodates crossing 360 degree point
-                downside = (row[Azimuth] - half_beamwidth)  #calc angle from center of beam down
-                downside %= 360      # accomodates crossing 360 degree point
-                # print("AZ- "+str(row[Azimuth]) + " up-" + str(upside) + " down-" + str(downside))
-
-                up_lat, up_lon = get_point_at_distance(row["LATITUDE"], row["LONGITUDE"],d=length,bearing=upside)
-                dwn_lat, dwn_lon = get_point_at_distance(row["LATITUDE"], row["LONGITUDE"],d=length,bearing=downside)
-                
-                # try:
-                #     leafmap.folium.PolyLine([[row["LATITUDE"],row["LONGITUDE"]], [up_lat,up_lon]],color=wedge_color).add_to(Map)    # lines for exterior wedge shape
-                #     leafmap.folium.PolyLine([[row["LATITUDE"],row["LONGITUDE"]], [dwn_lat,dwn_lon]],color=wedge_color).add_to(Map)
-                # except ValueError:
-                #     print("there are NaN in the location data set")
-                #     pass
-
-
         except TypeError:
             st.info("Assign columns for Sector Footprint Size (Radius from Station in Meters), Tower Direction/Azimuth (Degrees), & Beam Width (Degrees)")
+            pass
+        except ValueError:
+            st.info("Assign columns for Sector Footprint Size (Radius from Station in Meters), Tower Direction/Azimuth (Degrees), & Beam Width (Degrees)")
+            pass
+
+
+      
         
+    
     Map.to_streamlit()
     
     col1, col2, col3, col4, col5 = st.columns(5)
