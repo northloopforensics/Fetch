@@ -2,7 +2,7 @@ A tool to help investigators convert raw data into actionable maps.
 
 # Version 3 is here!
 
-Try out the web app: https://northloopforensics-fetch-fetch-v3-5-vklwtp.streamlit.app/
+Try out the web app: https://northloopforensics-fetch-v3-6.streamlit.app
 
 ![alt text](https://user-images.githubusercontent.com/73806121/228633379-85d9099e-33b9-4ccf-841f-9f012e994a85.png)
 
@@ -48,7 +48,7 @@ Additional support for mapping IP addresses has been added in "IP Address Mappin
 
 ![alt text](https://github.com/northloopforensics/Fetch/assets/73806121/ff4c2a98-eb86-4b6c-ad9d-34aeeed25e5d)
 
-
+Thanks to Jonathan Todd for contributions on GPX support!
 
 
 
