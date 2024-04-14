@@ -922,3 +922,22 @@ if uploaded_file != None:
     with tab3:
         make_geofence_map()
     
+# add a button to open a popup window that will contain hyperlinks
+st.markdown("---")
+st.markdown(":orange[Fetch_v3.7]")
+with st.expander("Privacy Statement"):
+    st.write("""
+    ## Data Privacy Statement
+    
+    We take your privacy seriously. North Loop Consulting will only have temporary access to small portions of data that may be involved in error reporting.  
+    This data will not be stored for any period longer than needed to identify and correct any issues, if at all.
+                
+    We make use of a third party company, Streamlit, to provide hosting for Fetch.  
+    For more information about Streamlit and their handling of user data, please refer to their [Privacy Policy](https://streamlit.io/privacy-policy).
+    
+    For specific information about how Streamlit handles data sets you have uploaded as files, please refer to their 
+    [documents on file uploads](https://docs.streamlit.io/knowledge-base/using-streamlit/where-file-uploader-store-when-deleted).
+    
+    It is always best to avoid uploading sensitive data to any online service. Please do not upload any data that may contain personal identifiable information or sensitive data.
+
+    """)
