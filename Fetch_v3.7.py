@@ -924,7 +924,7 @@ if uploaded_file != None:
     
 # add a button to open a popup window that will contain hyperlinks
 st.markdown("---")
-st.markdown(":orange[(c) North Loop Consulting - Fetch_v3.7]")
+st.markdown(":orange[© 2024 North Loop Consulting - Fetch_v3.7]")
 with st.expander("Privacy Statement"):
     st.write("""
     ## Data Privacy Statement
