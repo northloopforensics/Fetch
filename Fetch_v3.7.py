@@ -924,7 +924,7 @@ if uploaded_file != None:
     
 # add a button to open a popup window that will contain hyperlinks
 st.markdown("---")
-st.markdown(":orange[© 2024 North Loop Consulting - Fetch_v3.7]")
+
 with st.expander("Privacy Statement"):
     st.write("""
     ## Data Privacy Statement
@@ -941,3 +941,4 @@ with st.expander("Privacy Statement"):
     It is always best to avoid uploading sensitive data to any online service. Please do not upload any data that may contain personal identifiable information or sensitive data.
 
     """)
+st.markdown(":orange[© 2024 North Loop Consulting - Fetch_v3.7]")
