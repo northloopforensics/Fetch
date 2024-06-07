@@ -927,7 +927,7 @@ st.markdown("---")
 
 with st.expander("Privacy Statement"):
     st.write("""
-    ## Data Privacy Statement
+    ## Data Privacy Statement and API Usage Information
     
     We take your privacy seriously. North Loop Consulting will only have temporary access to small portions of data that may be involved in error reporting.  
     This data will not be stored for any period longer than needed to identify and correct any issues, if at all.
@@ -940,5 +940,6 @@ with st.expander("Privacy Statement"):
     
     It is always best to avoid uploading sensitive data to any online service. Please do not upload any data that may contain personal identifiable information or sensitive data.
 
+    Fetch intended to be a free tool available to everyone.  To do this free resources are used to return information like IP address data.  There are caps on this free usage.  You may run into periods where that cap has been met and these resources are not available. If you would like to explore financial support for the tool to expand these capabilities, I am open to the conversation. Just reach out via the Contact Page on our site.   
     """)
 st.markdown(":orange[© 2024 North Loop Consulting - Fetch_v3.7]")
