@@ -925,7 +925,7 @@ if uploaded_file != None:
 # add a button to open a popup window that will contain hyperlinks
 st.markdown("---")
 
-with st.expander("Privacy Statement"):
+with st.expander("Privacy Statement and API Use"):
     st.write("""
     ## Data Privacy Statement and API Usage Information
     
@@ -940,6 +940,6 @@ with st.expander("Privacy Statement"):
     
     It is always best to avoid uploading sensitive data to any online service. Please do not upload any data that may contain personal identifiable information or sensitive data.
 
-    Fetch intended to be a free tool available to everyone.  To do this free resources are used to return information like IP address data.  There are caps on this free usage.  You may run into periods where that cap has been met and these resources are not available. If you would like to explore financial support for the tool to expand these capabilities, I am open to the conversation. Just reach out via the Contact Page on our site.   
+    Fetch is intended to be a free tool available to everyone.  To do this, free resources are used to return information like IP address data.  There are caps on this free usage.  You may run into periods where that cap has been met and these resources are not available. If you would like to explore financial support for the tool to expand these capabilities, I am open to the conversation. Just reach out via the Contact Page on our site.   
     """)
 st.markdown(":orange[© 2024 North Loop Consulting - Fetch_v3.7]")
