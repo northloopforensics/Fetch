@@ -12,6 +12,7 @@
 # 2.  Added support for KML Tours
 # 3.  Updated support for vapor trails
 # 4.  Improved KML creation UI
+# 5.  Geocoder improvements
 
 
 import simplekml #the library used to map longitudes and latitudes on google earth
