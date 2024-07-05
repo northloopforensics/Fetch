@@ -727,6 +727,7 @@ def declutterer(in_df, date_column):
 
 ####    Main Page   ####
 notices = st.empty()            #   Places notifications at the top of the screen
+st.success("We are continuing to improve Fetch!  This version, 3.6, is two releases behind and will be taken down on October 1, 2024. To use the latest release, visit https://northloopconsulting.com/products. Thanks for using Fetch!")
 # filename = st.text_input(":red[Provide Map Name*]",)
 uploaded_file = st.file_uploader("Choose a CSV, TXT (Comma Seperated), TSV, Excel, or GPX file", type=["csv","txt","tsv","xlsx","xls","gpx"], accept_multiple_files=False)
 
