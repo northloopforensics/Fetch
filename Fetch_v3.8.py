@@ -814,7 +814,7 @@ def create_kml(df_in, outfile):
 
                 st.download_button("Download KML Tour", data=tour_data, file_name="Fetch_KML_Tour.kml")
 
-            #st.success(f"KML file has been stored to: {outfile}")
+            #st.success(f"KML file has been created. Click below to download.")
 
 
 def time_range_slider(in_df):
