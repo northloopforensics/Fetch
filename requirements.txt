@@ -10,4 +10,3 @@ streamlit==1.25.0
 streamlit_folium==0.11.1
 openpyxl
 gpxpy
-pillow==10.4.0
