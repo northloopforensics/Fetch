@@ -19,7 +19,7 @@
 import simplekml #the library used to map longitudes and latitudes on google earth
 import pandas #used to read spreadsheet data
 import re
-import operator
+# import operator
 import streamlit as st
 import chardet      #   used to check file encodings
 import os
@@ -37,7 +37,6 @@ import gpxpy
 import numpy as np
 from dateutil import parser
 import xml.etree.ElementTree as ET
-import time
 
 
 now = datetime.datetime.now()
