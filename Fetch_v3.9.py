@@ -37,7 +37,9 @@ import gpxpy
 import numpy as np
 from dateutil import parser
 import xml.etree.ElementTree as ET
-
+import shutil
+import tempfile
+import zipfile
 
 now = datetime.datetime.now()
 st.set_page_config(
@@ -614,6 +616,26 @@ def make_dataframe(infile, outfile):       #   changes input file to pandas data
         except OverflowError:
             st.error("File is too large to process.")
 
+    elif (".kmz") in str(infile):
+        with zipfile.ZipFile(infile, 'r') as kmz:
+            # Find the KML file inside the KMZ archive
+            kml_file_name = None
+            for file_name in kmz.namelist():
+                st.info(file_name)
+                if file_name.endswith('.kml'):
+                    kml_file_name = file_name
+                    break
+        
+            # Check if a KML file was found
+            if kml_file_name:
+                # Extract the KML file's contents
+                kml_content = kmz.read(kml_file_name).decode('utf-8')
+                dataf = convert_kml_2_DF(kml_content)
+                # Display KML file content or process it further
+            else:
+                st.error("No KML file found in the KMZ archive!")
+        
+     
     elif (".gpx") in str(infile):
         # with open(infile, 'r') as f:
         gpx = gpxpy.parse(infile)
@@ -914,8 +936,10 @@ def declutterer(in_df, date_column):
 #### In Progress
 
 def convert_kml_2_DF(kml_file):
-    # Parse the KML file
-    tree = ET.parse(kml_file)
+    if type(kml_file) == str:   # used for parsing kml collected from kmz
+        tree = ET.ElementTree(ET.fromstring(kml_file))
+    else:                    # used for parsing a direct kml submission
+        tree = ET.parse(kml_file)
     root = tree.getroot()
 
     # Namespace dictionary to handle namespaces in the KML file
@@ -964,16 +988,34 @@ def convert_kml_2_DF(kml_file):
                 data[key] = value
                 keys_seen.add(key.lower())
 
-        # Extract key-value pairs from the description field
-        description = placemark.find('kml:description', ns)
-        if description is not None:
-            desc_text = description.text.strip()
-            for line in desc_text.splitlines():
-                if ':' in line:
-                    key, value = map(str.strip, line.split(':', 1))
-                    if key.lower() not in keys_seen:
-                        data[key] = value
-                        keys_seen.add(key.lower())
+        # # Extract key-value pairs from the description field
+        # description = placemark.find('kml:description', ns)
+        # if description is not None:
+        #     desc_text = description.text.strip()
+        #     for line in desc_text.splitlines():
+        #         if ':' in line:
+        #             key, value = map(str.strip, line.split(':', 1))
+        #             if key.lower() not in keys_seen:
+        #                 data[key] = value
+        #                 keys_seen.add(key.lower())
+        # Extract all extended data fields (both Data and SchemaData/SimpleData)
+        # Handle Data elements
+        extended_data = placemark.findall('.//kml:ExtendedData/kml:Data', ns)
+        for ed in extended_data:
+            key = ed.attrib.get('name')
+            if key and key.lower() not in keys_seen:
+                value = ed.find('kml:value', ns).text if ed.find('kml:value', ns) is not None else ''
+                data[key] = value
+                keys_seen.add(key.lower())
+
+        # Handle SchemaData elements
+        schema_data = placemark.findall('.//kml:ExtendedData/kml:SchemaData/kml:SimpleData', ns)
+        for sd in schema_data:
+            key = sd.attrib.get('name')
+            value = sd.text if sd is not None else ''
+            if key and key.lower() not in keys_seen:
+                data[key] = value
+                keys_seen.add(key.lower())
 
         # Add the placemark data to the list
         placemark_data.append(data)
@@ -995,11 +1037,9 @@ def convert_kml_2_DF(kml_file):
 
 ####    Main Page   ####
 notices = st.empty()            #   Places notifications at the top of the screen
-# filename = st.text_input(":red[Provide Map Name*]",)
-uploaded_file = st.file_uploader("Choose a CSV, TXT (Comma Seperated), TSV, Excel, GPX, or KML (Polygons Not Supported)", type=["csv","txt","tsv","xlsx","xls","gpx", 'kml'], accept_multiple_files=False)
+uploaded_file = st.file_uploader("Choose a CSV, TXT (Comma Seperated), TSV, Excel, GPX, KMZ or KML (Polygons Not Supported)", type=["csv","txt","tsv","xlsx","xls","gpx", 'kmz','kml'], accept_multiple_files=False)
 
 if uploaded_file != None:
-    # filename = st.text_input(":red[Provide Map Name*]",)
     with st.expander("Manage Ingested Data"):
         tabi, tabii, tabiii = st.tabs(["Review Ingest Data", "Time Filter", "Declutter"])
         with tabi:
@@ -1012,9 +1052,8 @@ if uploaded_file != None:
                 if encode_options == "Use Manual Encoding Selection":       
                     selected_encoding = st.selectbox("Choose File Encoding",options=["utf-8", 'utf-8-sig', 'utf-16', 'ISO-8859-1'])
                 uploaded_file.seek(0)       #refresh action
-                outFile = KML_output_file("MITE_KML_Map"+str(now))
-
-                # print(outFile)
+                outFile = KML_output_file("Fetch_KML_Map"+str(now))
+                
                 try:
                     get_headings, preview_data = make_dataframe(uploaded_file, outfile=outFile)
                 except UnboundLocalError:
@@ -1027,7 +1066,6 @@ if uploaded_file != None:
             if filterbytime == True:
                 datetime_Column = st.selectbox("Select Date/Time Column", options=preview_data.columns)
                 preview_data = time_filter(preview_data,date_column=datetime_Column)
-                print(preview_data)
                 
         with tabiii:
             declutter_dis = st.checkbox("Consolidate points to an average location based on selected time interval.")
@@ -1038,7 +1076,7 @@ if uploaded_file != None:
                     st.error("Select column with Date/Time data.")
                 try:
                     preview_data = declutterer(preview_data, date_column=datetim_Column)
-                    print(preview_data)
+                    
                 except Exception:
                     st.error("Select date/time column")
 
@@ -1059,15 +1097,9 @@ if uploaded_file != None:
             st.map(preview_data)
             st.download_button("Download as CSV", data=preview_data.to_csv(), file_name="Fetch_CSV_Export.csv")
         except TypeError:
-            st.error("Ensure you have correct settings in Manage Ingested Data and Date/Time Filtering. Remove any non-numeric characters from your Lat/Long columns.")  
-        # except Exception:
-        #     # st.error("Check your data input. Hints - Must have Latitude and Longitude columns. Remove unnecessary header rows.")
-        #     st.error("Error: Please review your data set and ensure it is formatted correctly. Must include 'Latitude' and 'Longitude' columns. Remove any unnecessary header rows.")
- 
-        # icon = st.selectbox("Select Map Point Icon Style", options=icon_options)
-        # footprint = st.checkbox("Dataset includes radius/area information",)
-        
-
+            st.error("Ensure you have correct settings in Manage Ingested Data and Date/Time Filtering. Remove any non-numeric characters from your Lat/Long columns.")          
+        except NameError:
+            st.error("preview data not defined")
         # KML = st.button("GENERATE KML")
         st.markdown("---")
         try:
@@ -1076,10 +1108,10 @@ if uploaded_file != None:
             st.error(f"Error generating KML: {e}")
         
     with tab2:
-        # try:
-        make_map(preview_data)
-        # except AttributeError:
-        #     st.error("Check that your data has Latitude and Longitude columns")
+        try:
+            make_map(preview_data)
+        except AttributeError:
+            st.error("Check that your data has Latitude and Longitude columns")
     with tab3:
         make_geofence_map()
     
