@@ -8,7 +8,7 @@
 #           Add details to cell site sector wedges
 
 # Completed Updates:
-# 1.  This update addes radius/footprint to circle markers.
+# 1.  This update adds radius/footprint to circle markers.
 
 
 import simplekml #the library used to map longitudes and latitudes on google earth
