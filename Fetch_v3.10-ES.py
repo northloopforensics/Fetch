@@ -699,6 +699,11 @@ def make_dataframe(infile, outfile):       #   changes input file to pandas data
         first_five_lines = first_five_lines.loc[:,~first_five_lines.columns.duplicated()]
         st.dataframe(data=first_five_lines, use_container_width=True)
         headers = dataf.columns.to_list()
+
+        # Check if the columns are in Spanish and rename them to English
+        if 'LATITUD' in dataf.columns and 'LONGITUD' in dataf.columns:
+            dataf = dataf.rename(columns={'LATITUD': 'LATITUDE', 'LONGITUD': 'LONGITUDE'})
+        
         try:
             dataf['LATITUDE'].replace('', np.nan, inplace=True)     # added to address NaN values in dataframe
             dataf.dropna(subset=['LATITUDE'], inplace=True)
