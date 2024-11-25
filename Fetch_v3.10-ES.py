@@ -1076,8 +1076,8 @@ notices = st.empty()            #   Places notifications at the top of the scree
 uploaded_file = st.file_uploader("Elija un archivo CSV, TXT (separado por comas), TSV, Excel, GPX, KMZ o KML (polígonos no soportados))", type=["csv","txt","tsv","xlsx","xls","gpx", 'kmz','kml'], accept_multiple_files=False)
 
 if uploaded_file != None:
-    with st.expander("Gestionar Datos Ingeridos"):
-        tabi, tabii, tabiii = st.tabs(["Revisar Datos Ingeridos", "Filtro de Tiempo", "Desordenar"])
+    with st.expander("Gestionar Datos"):
+        tabi, tabii, tabiii = st.tabs(["Revisar Datos", "Filtro de Tiempo", "Desordenar"])
         with tabi:
             lines_t0_remove = st.slider(label="Número de Filas a Eliminar del Inicio de la Tabla      (La primera línea debe incluir 'Latitud' y 'Longitud'))", min_value=0, max_value=10)
             if uploaded_file != None:   
