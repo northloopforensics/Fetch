@@ -2,13 +2,11 @@
 
 #This program creates geofence data based on user input and plotting locations provided in CSV, TSV, and Excel formats
 
-#   TO DO - Time slider is not updated when picking dates w calendar, declutter
-#           
-#           Add time filter support to cell site maps
-#           Add details to cell site sector wedges
+
 
 # Completed Updates:
-# 1.  This update addes radius/footprint to circle markers.
+# 1.  Color selection on vapour trails
+# 2.  Improved error handling 
 
 
 import simplekml #the library used to map longitudes and latitudes on google earth
