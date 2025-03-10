@@ -736,71 +736,6 @@ def make_map(in_df):       #bring in pandas dataframe
                     st.warning("No valid data points found for creating vapor trail")
             
         
-        # if map_Type == "Cell Sites":
-        #     towermastpoint = Map.add_circle_markers_from_xy(data=gdf, x="LONGITUDE", y="LATITUDE",color='white',fill_color='white', radius=1)
-
-        #     gdf.columns = gdf.columns.str.upper()
-        #     gdf.geometry = gdf["GEOMETRY"]
-        #     Map.zoom_to_gdf(gdf) 
-            
-        #     st.markdown("---")
-
-        #     wedge_color = st.selectbox("Sector Color", options=['Red', 'Blue', 'Green', 'Purple', 'Orange', 'DarkRed', 'Beige', 'DarkBlue', 'DarkGreen', 'CadetBlue', 'Pink', 'LightBlue', 'LightGreen', 'Gray', 'Black', 'LightGray'])
-
-        #     # Create radius column based on selection before using it
-        #     radii_list = ["1.5 Miles", "1 Kilometer"]
-        #     for oto in in_df.columns:
-        #         radii_list.append(oto)
-        #     radii = st.selectbox("Sector Footprint Size", options=radii_list)
-            
-        #     # Create the radius column based on selection
-        #     if radii == "1.5 Miles":
-        #         in_df = in_df.copy()  # Create a copy to avoid SettingWithCopyWarning
-        #         in_df["1.5 Miles"] = 2414  # Convert miles to meters
-        #         gdf["1.5 Miles"] = 2414  # Add to gdf as well
-        #     elif radii == "1 Kilometer":
-        #         in_df = in_df.copy()  # Create a copy to avoid SettingWithCopyWarning
-        #         in_df["1 Kilometer"] = 1000
-        #         gdf["1 Kilometer"] = 1000  # Add to gdf as well
-            
-        #     # Add any existing column data if not using preset distances
-        #     if radii not in ["1.5 Miles", "1 Kilometer"]:
-        #         if radii in in_df.columns:
-        #             gdf[radii] = in_df[radii]
-
-        #     Azimuth = st.selectbox("Sector Azimuth", options=in_df.columns)   
-        #     beam_width = st.selectbox("Sector Beam Width", options=in_df.columns, placeholder='None')
-            
-        #     try:
-        #         for index, row in gdf.iterrows():
-        #             if radii in row:
-        #                 length = float(row[radii])/1000  # Convert to km
-        #                 half_beamwidth = float(row[beam_width]) / 2
-        #                 upside = (float(row[Azimuth]) + half_beamwidth) % 360
-        #                 downside = (float(row[Azimuth]) - half_beamwidth) % 360
-                        
-        #                 up_lat, up_lon = get_point_at_distance(row["LATITUDE"], row["LONGITUDE"], d=length, bearing=upside)
-        #                 dwn_lat, dwn_lon = get_point_at_distance(row["LATITUDE"], row["LONGITUDE"], d=length, bearing=downside)
-                        
-        #                 leafmap.folium.PolyLine([[row["LATITUDE"],row["LONGITUDE"]], [up_lat,up_lon]], color=wedge_color).add_to(Map)
-        #                 leafmap.folium.PolyLine([[row["LATITUDE"],row["LONGITUDE"]], [dwn_lat,dwn_lon]], color=wedge_color).add_to(Map)
-                        
-        #                 plugins.SemiCircle(
-        #                     (row["LATITUDE"],row["LONGITUDE"]),
-        #                     radius=float(row[radii])/2,
-        #                     direction=float(row[Azimuth]),
-        #                     arc=float(row[beam_width]),
-        #                     color=None,
-        #                     fill_color=wedge_color,
-        #                     opacity=1,
-        #                     fill_opacity=.5,
-        #                     popup=('<br>'.join(f'{k}: {v}' for k, v in row.items()))
-        #                 ).add_to(Map)
-                        
-        #     except (TypeError, ValueError) as e:
-        #         st.info("Assign columns for Sector Footprint Size (Radius from Station in Meters), Tower Direction/Azimuth (Degrees), & Beam Width (Degrees)")
-        #         st.error(f"Error: {str(e)}")
-    
         if map_Type == "Cell Sites":
             towermastpoint = Map.add_circle_markers_from_xy(data=gdf, x="LONGITUDE", y="LATITUDE",color='white',fill_color='white', radius=1)
 
@@ -940,84 +875,7 @@ def KML_output_file(name_for_file):
 def get_file_encoding(infile):      #checks file encoding
     return (chardet.detect(infile.read()))
  
-def make_dataframe(infile, outfile):
-    """Changes input file to pandas dataframe"""
-    file_name = str(infile).lower()  # Convert filename to lowercase for comparison
-    
-    if any(ext in file_name for ext in [".xls", ".xlsx"]):
-        dataf = pandas.read_excel(infile)
-    elif any(ext in file_name for ext in [".csv", ".txt"]):
-        try:
-            dataf = pandas.read_csv(infile, encoding=selected_encoding)
-        except UnicodeError:
-            st.error("Decoding error. Try another encoding method.")
-            pass
-    elif ".tsv" in file_name:
-        try:
-            dataf = pandas.read_csv(infile, encoding=selected_encoding, sep="\t")
-        except UnicodeError:
-            st.error("Decoding error. Try another encoding method.")
-            pass
-    elif ".kml" in file_name:
-        try:
-            dataf = convert_kml_2_DF(infile)
-        except OverflowError:
-            st.error("File is too large to process.")
-    elif ".kmz" in file_name:
-        with zipfile.ZipFile(infile, 'r') as kmz:
-            # Find the KML file inside the KMZ archive
-            kml_file_name = None
-            for file_name in kmz.namelist():
-                st.info(file_name)
-                if file_name.lower().endswith('.kml'):
-                    kml_file_name = file_name
-                    break
-            
-            if kml_file_name:
-                kml_content = kmz.read(kml_file_name).decode('utf-8')
-                dataf = convert_kml_2_DF(kml_content)
-            else:
-                st.error("No KML file found in the KMZ archive!")
-    elif ".gpx" in file_name:
-        gpx = gpxpy.parse(infile)
-        points_data = []
-        for track in gpx.tracks:
-            for segment in track.segments:
-                for point in segment.points:
-                    point_data = {
-                        'latitude': point.latitude,
-                        'longitude': point.longitude,
-                        'elevation': point.elevation,
-                        'time': point.time
-                    }
-                    points_data.append(point_data)
-        dataf = pandas.DataFrame.from_records(points_data)
-
-    n = lines_t0_remove
-    if n > 0:
-        dataf.columns = dataf.iloc[n-1] 
-    try:  
-        dataf.columns = dataf.columns.str.upper()
-        dataf = dataf[0:]
-        dataf = dataf.iloc[n:]
-        first_five_lines = dataf.head(6)
-        first_five_lines = first_five_lines.loc[:,~first_five_lines.columns.duplicated()]
-        st.dataframe(data=first_five_lines, use_container_width=True)
-        headers = dataf.columns.to_list()
-        try:
-            dataf['LATITUDE'].replace('', np.nan, inplace=True)     # added to address NaN values in dataframe
-            dataf.dropna(subset=['LATITUDE'], inplace=True)
-        except KeyError:
-            st.error("No 'LATITUDE' column found in data set.")
-        try:
-            dataf['LONGITUDE'].replace('', np.nan, inplace=True)
-            dataf.dropna(subset=['LONGITUDE'], inplace=True)
-        except KeyError:
-            st.error("No 'LONGITUDE' column found in data set.")
-        return headers, dataf 
-    except AttributeError:
-        st.error('Ensure that the data set is formatted correctly and includes a "Latitude" and "Longitude" column.')                
-
+# 
 
 def create_kml_tour(df, output_file, altitude, tilt, linger, time_column, icon, footprint, radii):
     """
@@ -1106,7 +964,13 @@ def create_kml(df_in, outfile):
 
         # Streamlit UI for selecting columns
         st.subheader("Design Your KML Map")
-        icon = st.selectbox("Select Map Point Icon Style", options=icon_options)        
+        
+        # Only show color selector if there's no POINT_COLOR column
+        if 'POINT_COLOR' not in df_in.columns:
+            icon = st.selectbox("Select Map Point Icon Style", options=icon_options)
+        else:
+            icon = "Yellow Paddle"  # Default icon style
+            st.info("Using colors selected during file upload")
 
         label_for_icons = st.selectbox("Map Icon Labels", options=headers)
         
@@ -1116,7 +980,7 @@ def create_kml(df_in, outfile):
             radii = st.selectbox("Radius/Distance-from-Point in Meters", options=headers)
         
         tour = st.checkbox("Include KML Tour", value=False)
-        if tour:        # Tour Settings
+        if tour:     # Tour Settings
             st.subheader("Design Tour Settings")
             there_are_dates = st.checkbox("Data set includes date/time information", value=False)
             if there_are_dates:
@@ -1136,10 +1000,10 @@ def create_kml(df_in, outfile):
         if not filename:
             st.error("Map Name Required")
         else:
-            kml = simplekml.Kml()
-            Label = label_for_icons
-            
             try:
+                kml = simplekml.Kml()
+                Label = label_for_icons
+                
                 for idx, row in df_in.iterrows():
                     lon, lat = row['LONGITUDE'], row['LATITUDE']
                     description_lines = [f"{key}: {value}" for key, value in row.items()]
@@ -1149,19 +1013,37 @@ def create_kml(df_in, outfile):
                     lati = re.findall(r'([0-9.-]+)', str(lat))[0]
 
                     point = kml.newpoint(name=lab, coords=[(float(long), float(lati))], description=descript)
-                    point.style.iconstyle.icon.href = selected_icon[icon]
+                    # Use point color from dataframe if available, otherwise use selected icon
+                    if 'POINT_COLOR' in row:
+                        # Convert hex color to KML color format (aabbggrr)
+                        hex_color = row['POINT_COLOR'].lstrip('#')
+                        rgb = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+                        kml_color = simplekml.Color.rgb(*rgb)
+                        
+                        point.style.iconstyle.icon.href = selected_icon[icon]
+                        point.style.iconstyle.color = kml_color
+                    else:
+                        point.style.iconstyle.icon.href = selected_icon[icon]
 
                     if footprint and radii:
                         rad = row[radii]
-                        polycircle = polycircles.Polycircle(latitude=float(lati),
-                                                           longitude=float(long),
-                                                           radius=float(rad),
-                                                           number_of_vertices=72)
+                        polycircle = polycircles.Polycircle(
+                            latitude=float(lati),
+                            longitude=float(long),
+                            radius=float(rad),
+                            number_of_vertices=72
+                        )
 
                         pol = kml.newpolygon(name=f"{lati}, {long}, {rad}", outerboundaryis=polycircle.to_kml())
-                        pol.style.polystyle.color = get_footprint_color(icon_Color=icon)
+                        # Use point color for footprint if available
+                        if 'POINT_COLOR' in row:
+                            pol.style.polystyle.color = kml_color
+                        else:
+                            pol.style.polystyle.color = get_footprint_color(icon_Color=icon)
+                            
             except Exception as e:
                 st.error(f"Error generating KML: {e}")
+                return
 
             if not tour:
                 # Generate normal KML file
@@ -1174,7 +1056,9 @@ def create_kml(df_in, outfile):
             if tour:
                 # Generate the KML tour file
                 tourfile = 'tour.kml'
-                create_kml_tour(df=df_in, output_file=tourfile, altitude=tour_altitude, tilt=tour_tilt, linger=tour_linger_time, time_column=time_column, icon=icon, footprint=footprint, radii=radii)
+                create_kml_tour(df=df_in, output_file=tourfile, altitude=tour_altitude, 
+                              tilt=tour_tilt, linger=tour_linger_time, time_column=time_column, 
+                              icon=icon, footprint=footprint, radii=radii)
                 with open(tourfile, 'rb') as f:
                     tour_data = f.read()
 
@@ -1356,10 +1240,6 @@ def convert_kml_2_DF(kml_file):
     # print(df)
     return df
 
-########################################
-#### In Progress ####
-#
-
 
 def ingest_multiple_files():
     uploaded_files = st.file_uploader("Choose files to analyze", 
@@ -1488,6 +1368,10 @@ def ingest_multiple_files():
 
 
 ########################################
+#### In Progress ####
+
+
+########################################
 
 ####    Main Page   ####
 
@@ -1495,37 +1379,6 @@ uploaded_file = None
 preview_data = None
 notices = st.empty()            #   Places notifications at the top of the screen
 
-
-    
-# if upload_mode == "Single":
-#     uploaded_file = st.file_uploader(
-#     "Choose a CSV, TXT, TSV, Excel, GPX, KMZ or KML file",
-#             type=["csv", "txt", "tsv", "xlsx", "xls", "gpx", "kmz", "kml",
-#                 "CSV", "TXT", "TSV", "XLSX", "XLS", "GPX", "KMZ", "KML"],
-#                 accept_multiple_files=False)
-#     if uploaded_file is not None:
-#         # Process single file as before
-#         with st.expander("Manage Ingested Data"):
-#             lines_t0_remove = st.slider(
-#                 "Number of Rows to Remove from Start of Table",
-#                 min_value=0, max_value=10
-#             )
-#             suggested_encoding = get_file_encoding(uploaded_file)
-#             encode_options = st.radio(
-#                 "Encoding Options",
-#                 options=[f"Use Suggested Encoding: {suggested_encoding['encoding']}", "Use Manual Encoding Selection"],
-#                 horizontal=True
-#             )
-#             if encode_options.startswith("Use Suggested"):
-#                 selected_encoding = suggested_encoding['encoding']
-#             else:
-#                 selected_encoding = st.selectbox("Choose File Encoding", options=["utf-8", "utf-8-sig", "utf-16", "ISO-8859-1"])
-#             uploaded_file.seek(0)
-#             outFile = KML_output_file("Fetch_KML_Map" + str(now))
-#             try:
-#                 get_headings, preview_data = make_dataframe(uploaded_file, outfile=outFile)
-#             except Exception as e:
-#                 st.error(f"Error processing file: {e}")
 
 # else:
 combined_df = ingest_multiple_files()
@@ -1547,23 +1400,7 @@ if preview_data is not None:
                 max_value=10
             )            
 
-            # if uploaded_file != None:   
-            #     suggested_encoding = get_file_encoding(uploaded_file)       #   block attempts to find csv encoding and allow manual choice
-            #     encode_options = st.radio(label="Encoding Options", options=["Use Suggested Encoding: " + str(suggested_encoding['encoding']), "Use Manual Encoding Selection"],horizontal=True)
-            #     if encode_options == "Use Suggested Encoding: " + str(suggested_encoding['encoding']):
-            #         selected_encoding = suggested_encoding['encoding']
-            #     if encode_options == "Use Manual Encoding Selection":       
-            #         selected_encoding = st.selectbox("Choose File Encoding",options=["utf-8", 'utf-8-sig', 'utf-16', 'ISO-8859-1'])
-            #     uploaded_file.seek(0)       #refresh action
-            #     outFile = KML_output_file("Fetch_KML_Map"+str(now))
-                
-            #     try:
-            #         get_headings, preview_data = make_dataframe(uploaded_file, outfile=outFile)
-            #     except UnboundLocalError:
-            #         pass
-            #     except TypeError:
-            #         st.error("Keep altering the row selection...")
-
+           
         with tabii:
             filterbytime = st.checkbox("Filter by Date/Time")
             if filterbytime == True:
