@@ -1243,8 +1243,7 @@ def convert_kml_2_DF(kml_file):
 
 def ingest_multiple_files():
     uploaded_files = st.file_uploader("Choose files to analyze", 
-                                    type=["csv", "txt", "tsv", "xlsx", "xls", "gpx", "kmz", "kml",
-                                          "CSV", "TXT", "TSV", "XLSX", "XLS", "GPX", "KMZ", "KML"],
+                                    type=["csv", "txt", "tsv", "xlsx", "xls", "gpx", "kmz", "kml"],
                                     accept_multiple_files=True)
     if not uploaded_files:
         return None
