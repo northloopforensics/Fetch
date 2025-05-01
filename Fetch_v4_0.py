@@ -96,19 +96,19 @@ def add_color_legend(Map, df):
                     z-index: 1000;
                     background-color: #333333;
                     color: white;
-                    padding: 10px;
+                    padding: 5px;
                     border-radius: 5px;
                     border: 2px solid grey;
                     ">
-        <h4>Data Sources</h4>
+        <h5>Data Sources</h5>
         '''
         
         # Add each source file and its color to the legend
         for _, row in legend_items.iterrows():
             legend_html += f'''
             <div style="display: flex; align-items: center; margin: 5px;">
-                <div style="width: 20px; 
-                           height: 20px; 
+                <div style="width: 15px; 
+                           height: 15px; 
                            background-color: {row['POINT_COLOR']}; 
                            border-radius: 50%;
                            margin-right: 5px;">
