@@ -1571,7 +1571,48 @@ if preview_data is not None:
     tab1, tab2, tab3 = st.tabs(["Preview/KML Map", "Analysis Maps", "Create Geofence"])
     with tab1:
         try:
-            st.map(preview_data)
+            # Clean preview_data before passing to st.map to avoid null value errors
+            if 'LATITUDE' in preview_data.columns and 'LONGITUDE' in preview_data.columns:
+                # Count original records
+                original_count = len(preview_data)
+                
+                # Clean the data for st.map
+                clean_preview = preview_data.dropna(subset=['LATITUDE', 'LONGITUDE']).copy()
+                
+                # Additional validation to ensure numeric values
+                clean_preview = clean_preview[
+                    pandas.to_numeric(clean_preview['LATITUDE'], errors='coerce').notna() &
+                    pandas.to_numeric(clean_preview['LONGITUDE'], errors='coerce').notna()
+                ].copy()
+                
+                # Convert to numeric and remove infinite values
+                clean_preview['LATITUDE'] = pandas.to_numeric(clean_preview['LATITUDE'], errors='coerce')
+                clean_preview['LONGITUDE'] = pandas.to_numeric(clean_preview['LONGITUDE'], errors='coerce')
+                
+                clean_preview = clean_preview[
+                    pandas.notna(clean_preview['LATITUDE']) & 
+                    pandas.notna(clean_preview['LONGITUDE']) &
+                    np.isfinite(clean_preview['LATITUDE']) &
+                    np.isfinite(clean_preview['LONGITUDE'])
+                ]
+                
+                # Final cleanup
+                clean_preview = clean_preview.dropna(subset=['LATITUDE', 'LONGITUDE'])
+                
+                # Check if we have valid data for mapping
+                valid_count = len(clean_preview)
+                skipped_count = original_count - valid_count
+                
+                if skipped_count > 0:
+                    st.info(f"ℹ️ Preview map: Showing {valid_count} valid records. {skipped_count} records with missing coordinates were excluded from the map display.")
+                
+                if valid_count > 0:
+                    st.map(clean_preview)
+                else:
+                    st.error("No valid coordinate data available for preview map.")
+            else:
+                st.map(preview_data)
+                
             st.download_button("Download as CSV", data=preview_data.to_csv(), file_name="Fetch_CSV_Export.csv")
         except TypeError:
             st.error("Ensure you have correct settings in Manage Ingested Data and Date/Time Filtering. Remove any non-numeric characters from your Lat/Long columns.")          
