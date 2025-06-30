@@ -1464,16 +1464,35 @@ def ingest_multiple_files():
 
             # Clean up DataFrame
             # Create a copy to avoid SettingWithCopyWarning
-             # Reset index and drop old index
-            df = df.copy().reset_index(drop=True)
+            # Reset index and drop old index
+            if not df.empty:
+                df = df.copy().reset_index(drop=True)
+            else:
+                st.warning(f"File {file.name} contains no data")
+                continue
             
             # Standardize column names and remove duplicates
             df.columns = df.columns.str.upper()
-            df = df.loc[:, ~df.columns.duplicated()]
+            
+            # Check if dataframe is empty after processing
+            if df.empty:
+                st.warning(f"File {file.name} resulted in empty dataframe after processing")
+                continue
+                
+            # Remove duplicate columns safely
+            if len(df.columns) > 0:
+                df = df.loc[:, ~df.columns.duplicated()]
+            else:
+                st.error(f"File {file.name} has no valid columns")
+                continue
             
             # Add source tracking
-            df["SOURCE_FILE"] = file.name
-            df["POINT_COLOR"] = color_selections.get(file.name, "#FF0000")
+            try:
+                df["SOURCE_FILE"] = file.name
+                df["POINT_COLOR"] = color_selections.get(file.name, "#FF0000")
+            except Exception as assign_error:
+                st.error(f"Error adding tracking columns to {file.name}: {str(assign_error)}")
+                continue
             
             # Validate required columns
             if "LATITUDE" not in df.columns or "LONGITUDE" not in df.columns:
