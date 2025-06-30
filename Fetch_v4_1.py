@@ -1,6 +1,6 @@
 #Python3
 
-
+# fixed an issue where submitted data had empty or null values. those records are now skipped and user notified
 
 import simplekml #the library used to map longitudes and latitudes on google earth
 import pandas #used to read spreadsheet data
