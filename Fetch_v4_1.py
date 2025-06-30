@@ -1,14 +1,5 @@
 #Python3
 
-#This program creates geofence data based on user input and plotting locations provided in CSV, TSV, and Excel formats
-
-#   TO DO - Time slider is not updated when picking dates w calendar, declutter
-#           
-#           on the analysis maps adopt point colors for multi file entries
-#           if single file keep the color option
-
-# Completed Updates:
-# 1.  
 
 
 import simplekml #the library used to map longitudes and latitudes on google earth
