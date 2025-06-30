@@ -27,7 +27,7 @@ import zipfile
 
 now = datetime.datetime.now()
 st.set_page_config(
-   page_title="Fetch v4.0",
+   page_title="Fetch v4.1",
    #page_icon="🔴",
    layout="wide",
    initial_sidebar_state="expanded",
