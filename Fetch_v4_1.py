@@ -1,5 +1,16 @@
 #Python3
 
+#This program creates geofence data based on user input and plotting locations provided in CSV, TSV, and Excel formats
+
+#   TO DO - Time slider is not updated when picking dates w calendar, declutter
+#           
+#           on the analysis maps adopt point colors for multi file entries
+#           if single file keep the color option
+
+# Completed Updates:
+# 1.  
+
+
 import simplekml #the library used to map longitudes and latitudes on google earth
 import pandas #used to read spreadsheet data
 import re
@@ -353,6 +364,26 @@ def make_IPaddress_Map():   #used to map ips
             original_count = len(datfram)
             
             cleandf = pandas.DataFrame.dropna(datfram, subset=["LONGITUDE","LATITUDE"])
+            
+            # Additional validation to ensure numeric values
+            cleandf = cleandf[
+                pandas.to_numeric(cleandf['LATITUDE'], errors='coerce').notna() &
+                pandas.to_numeric(cleandf['LONGITUDE'], errors='coerce').notna()
+            ].copy()
+            
+            # Convert to numeric and remove infinite values
+            cleandf['LATITUDE'] = pandas.to_numeric(cleandf['LATITUDE'], errors='coerce')
+            cleandf['LONGITUDE'] = pandas.to_numeric(cleandf['LONGITUDE'], errors='coerce')
+            
+            cleandf = cleandf[
+                pandas.notna(cleandf['LATITUDE']) & 
+                pandas.notna(cleandf['LONGITUDE']) &
+                np.isfinite(cleandf['LATITUDE']) &
+                np.isfinite(cleandf['LONGITUDE'])
+            ]
+            
+            # Final dropna to ensure cleanliness
+            cleandf = cleandf.dropna(subset=["LONGITUDE","LATITUDE"])
             cleandf = cleandf.reset_index()
             
             # Count valid records and notify user
@@ -407,10 +438,32 @@ def make_map(in_df):       #bring in pandas dataframe
         # Count records before filtering
         original_count = len(in_df)
         
-        # Filter out records without valid latitude or longitude
-        valid_records = in_df.dropna(subset=['LATITUDE', 'LONGITUDE'])
+        # Filter out records without valid latitude or longitude FIRST
+        # Also filter out any records where lat/lng are not numeric
+        valid_records = in_df.dropna(subset=['LATITUDE', 'LONGITUDE']).copy()
         
-        # Count records after filtering
+        # Additional validation to ensure numeric values and remove any remaining nulls
+        valid_records = valid_records[
+            pandas.to_numeric(valid_records['LATITUDE'], errors='coerce').notna() &
+            pandas.to_numeric(valid_records['LONGITUDE'], errors='coerce').notna()
+        ].copy()
+        
+        # Convert to numeric to ensure proper data types and remove any non-finite values
+        valid_records['LATITUDE'] = pandas.to_numeric(valid_records['LATITUDE'], errors='coerce')
+        valid_records['LONGITUDE'] = pandas.to_numeric(valid_records['LONGITUDE'], errors='coerce')
+        
+        # Remove any infinite values
+        valid_records = valid_records[
+            pandas.notna(valid_records['LATITUDE']) & 
+            pandas.notna(valid_records['LONGITUDE']) &
+            np.isfinite(valid_records['LATITUDE']) &
+            np.isfinite(valid_records['LONGITUDE'])
+        ]
+        
+        # Final check to ensure no nulls remain
+        valid_records = valid_records.dropna(subset=['LATITUDE', 'LONGITUDE'])
+        
+        # Update count after all filtering
         valid_count = len(valid_records)
         skipped_count = original_count - valid_count
         
@@ -926,9 +979,30 @@ def create_kml_tour(df, output_file, altitude, tilt, linger, time_column, icon, 
         if 'LONGITUDE' not in df.columns or 'LATITUDE' not in df.columns:
             raise ValueError("DataFrame must contain 'LONGITUDE' and 'LATITUDE' columns.")
         
-        # Filter out records without valid latitude or longitude
+        # Filter out records without valid latitude or longitude FIRST
         original_count = len(df)
-        valid_df = df.dropna(subset=['LATITUDE', 'LONGITUDE'])
+        valid_df = df.dropna(subset=['LATITUDE', 'LONGITUDE']).copy()
+        
+        # Additional validation to ensure numeric values
+        valid_df = valid_df[
+            pandas.to_numeric(valid_df['LATITUDE'], errors='coerce').notna() &
+            pandas.to_numeric(valid_df['LONGITUDE'], errors='coerce').notna()
+        ].copy()
+        
+        # Convert to numeric and remove infinite values
+        valid_df['LATITUDE'] = pandas.to_numeric(valid_df['LATITUDE'], errors='coerce')
+        valid_df['LONGITUDE'] = pandas.to_numeric(valid_df['LONGITUDE'], errors='coerce')
+        
+        valid_df = valid_df[
+            pandas.notna(valid_df['LATITUDE']) & 
+            pandas.notna(valid_df['LONGITUDE']) &
+            np.isfinite(valid_df['LATITUDE']) &
+            np.isfinite(valid_df['LONGITUDE'])
+        ]
+        
+        # Final cleanup
+        valid_df = valid_df.dropna(subset=['LATITUDE', 'LONGITUDE'])
+        
         valid_count = len(valid_df)
         skipped_count = original_count - valid_count
         
@@ -1038,9 +1112,30 @@ def create_kml(df_in, outfile):
             st.error("Map Name Required")
         else:
             try:
-                # Filter out records without valid latitude or longitude
+                # Filter out records without valid latitude or longitude FIRST
                 original_count = len(df_in)
-                valid_df = df_in.dropna(subset=['LATITUDE', 'LONGITUDE'])
+                valid_df = df_in.dropna(subset=['LATITUDE', 'LONGITUDE']).copy()
+                
+                # Additional validation to ensure numeric values
+                valid_df = valid_df[
+                    pandas.to_numeric(valid_df['LATITUDE'], errors='coerce').notna() &
+                    pandas.to_numeric(valid_df['LONGITUDE'], errors='coerce').notna()
+                ].copy()
+                
+                # Convert to numeric and remove infinite values
+                valid_df['LATITUDE'] = pandas.to_numeric(valid_df['LATITUDE'], errors='coerce')
+                valid_df['LONGITUDE'] = pandas.to_numeric(valid_df['LONGITUDE'], errors='coerce')
+                
+                valid_df = valid_df[
+                    pandas.notna(valid_df['LATITUDE']) & 
+                    pandas.notna(valid_df['LONGITUDE']) &
+                    np.isfinite(valid_df['LATITUDE']) &
+                    np.isfinite(valid_df['LONGITUDE'])
+                ]
+                
+                # Final cleanup
+                valid_df = valid_df.dropna(subset=['LATITUDE', 'LONGITUDE'])
+                
                 valid_count = len(valid_df)
                 skipped_count = original_count - valid_count
                 
