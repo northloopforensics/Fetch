@@ -468,6 +468,8 @@ def make_map(in_df):       #bring in pandas dataframe
             return
         
         gdf = geopandas.GeoDataFrame(valid_records, geometry=geopandas.points_from_xy(valid_records.LONGITUDE, valid_records.LATITUDE))
+        # Reset index to ensure sequential indexing for iloc operations
+        gdf = gdf.reset_index(drop=True)
         map_Type = st.radio("Select Map Type", options=["Clustered Markers", "Points & Trails", "Heat Map", "Cell Sites"], horizontal=True)
         Map = leafmap.Map()
         #Zooms to bounds of the dataframe
@@ -529,8 +531,10 @@ def make_map(in_df):       #bring in pandas dataframe
                     
                     # Then add the markers with higher z-index
                     for idx, row in gdf.iterrows():
+                        # Create a single-row dataframe for this point
+                        single_point_df = pandas.DataFrame([row]).reset_index(drop=True)
                         circle_Points = Map.add_circle_markers_from_xy(
-                            data=gdf.iloc[[idx]], 
+                            data=single_point_df, 
                             x="LONGITUDE", 
                             y="LATITUDE",
                             color=row["POINT_COLOR"],
@@ -582,11 +586,15 @@ def make_map(in_df):       #bring in pandas dataframe
                     
                     # Create markers and paths for each source file
                     for source_file, group_df in grouped:
+                        # Reset index to avoid iloc issues
+                        group_df = group_df.reset_index(drop=True)
                         # Convert group DataFrame to GeoDataFrame
                         group_gdf = geopandas.GeoDataFrame(
                             group_df, 
                             geometry=geopandas.points_from_xy(group_df.LONGITUDE, group_df.LATITUDE)
                         )
+                        # Reset index for the geodataframe too
+                        group_gdf = group_gdf.reset_index(drop=True)
                         
                         # Add markers using the file's selected color
                         color = group_df['POINT_COLOR'].iloc[0]  # Get color for this file
@@ -679,6 +687,8 @@ def make_map(in_df):       #bring in pandas dataframe
                 if 'SOURCE_FILE' in gdf.columns:
                     # Group by source file
                     for source_file, group_df in gdf.groupby('SOURCE_FILE'):
+                        # Reset index to avoid iloc issues
+                        group_df = group_df.reset_index(drop=True)
                         color = group_df['POINT_COLOR'].iloc[0]  # Get color for this file
                         
                         # Process each group separately
