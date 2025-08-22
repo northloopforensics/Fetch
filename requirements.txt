@@ -16,3 +16,4 @@ numpy
 python-dateutil
 scikit-learn
 plotly
+keplergl
