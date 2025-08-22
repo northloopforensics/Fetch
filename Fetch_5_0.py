@@ -463,6 +463,12 @@ def make_geofence_map():
         user_geo_input = st.text_input("Search (Address/IP)", placeholder="123 Main St or 8.8.8.8")
         search = st.form_submit_button("Locate")
 
+    # Initialize session state for caching geocoding results
+    if 'cached_geocode_result' not in st.session_state:
+        st.session_state['cached_geocode_result'] = None
+    if 'cached_search_term' not in st.session_state:
+        st.session_state['cached_search_term'] = None
+
     global geomap
     # Initialize with neutral continental US view; we'll optionally recenter below
     geomap = folium.Map(zoom_start=4, location=[39,-98])
@@ -471,32 +477,224 @@ def make_geofence_map():
                      attr='Esri', name='Esri Satellite', overlay=False, control=True).add_to(geomap)
     folium.LayerControl(position="topright", collapsed=True).add_to(geomap)
 
-    # Geocode/IP locate
-    if user_geo_input:
+    # Geocode/IP locate - Only run when search button is clicked
+    if search and user_geo_input:
         ipv4_ipv6_regex = "(^\s*((([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5]))\s*$)|(^\s*((([0-9A-Fa-f]{1,4}:){7}([0-9A-Fa-f]{1,4}|:))|(([0-9A-Fa-f]{1,4}:){6}(:[0-9A-Fa-f]{1,4}|((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:){5}(((:[0-9A-Fa-f]{1,4}){1,2})|:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:){4}(((:[0-9A-Fa-f]{1,4}){1,3})|((:[0-9A-Fa-f]{1,4})?:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){3}(((:[0-9A-Fa-f]{1,4}){1,4})|((:[0-9A-Fa-f]{1,4}){0,2}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){2}(((:[0-9A-Fa-f]{1,4}){1,5})|((:[0-9A-Fa-f]{1,4}){0,3}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){1}(((:[0-9A-Fa-f]{1,4}){1,6})|((:[0-9A-Fa-f]{1,4}){0,4}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(:(((:[0-9A-Fa-f]{1,4}){1,7})|((:[0-9A-Fa-f]{1,4}){0,5}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:)))(%.+)?\s*$)"
-        if re.search(ipv4_ipv6_regex, user_geo_input):
-            try:
-                ip_res = geocoder.ipinfo(user_geo_input)
-                if ip_res and ip_res.latlng:
-                    folium.Marker(location=ip_res.latlng, tooltip=user_geo_input).add_to(geomap)
-                    # Rebuild map centered on result (Folium has no set_location; recreate map)
-                    geomap = folium.Map(location=ip_res.latlng, zoom_start=11)
-                    Draw(export=True, draw_options={'circle': False,'circlemarker':False, 'marker':False}).add_to(geomap)
-                    folium.TileLayer(tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-                                     attr='Esri', name='Esri Satellite', overlay=False, control=True).add_to(geomap)
-            except Exception:
-                st.warning("IP lookup failed")
+        
+        # Check if we need to make a new API call
+        if user_geo_input != st.session_state['cached_search_term']:
+            if re.search(ipv4_ipv6_regex, user_geo_input):
+                try:
+                    st.info("🔍 Looking up IP address... (API call)")
+                    ip_res = geocoder.ipinfo(user_geo_input)
+                    if ip_res and ip_res.latlng:
+                        # Cache the successful result
+                        st.session_state['cached_geocode_result'] = {
+                            'type': 'ip',
+                            'data': ip_res,
+                            'input': user_geo_input
+                        }
+                        st.session_state['cached_search_term'] = user_geo_input
+                        st.success("✅ IP address located successfully!")
+                    else:
+                        st.error("❌ Could not locate IP address")
+                        st.session_state['cached_geocode_result'] = None
+                        st.session_state['cached_search_term'] = None
+                except Exception as e:
+                    st.error(f"❌ IP lookup failed: {str(e)}")
+                    st.session_state['cached_geocode_result'] = None
+                    st.session_state['cached_search_term'] = None
+            else:
+                try:
+                    st.info("🔍 Looking up address... (API call)")
+                    geo_res = geocoder.arcgis(user_geo_input)
+                    if geo_res and geo_res.latlng:
+                        # Cache the successful result
+                        st.session_state['cached_geocode_result'] = {
+                            'type': 'address',
+                            'data': geo_res,
+                            'input': user_geo_input
+                        }
+                        st.session_state['cached_search_term'] = user_geo_input
+                        st.success("✅ Address located successfully!")
+                    else:
+                        st.error("❌ Could not locate address")
+                        st.session_state['cached_geocode_result'] = None
+                        st.session_state['cached_search_term'] = None
+                except Exception as e:
+                    st.error(f"❌ Address lookup failed: {str(e)}")
+                    st.session_state['cached_geocode_result'] = None
+                    st.session_state['cached_search_term'] = None
         else:
-            try:
-                geo_res = geocoder.arcgis(user_geo_input)
-                if geo_res and geo_res.latlng:
-                    folium.Marker(location=geo_res.latlng, tooltip=user_geo_input).add_to(geomap)
-                    geomap = folium.Map(location=geo_res.latlng, zoom_start=16)
-                    Draw(export=True, draw_options={'circle': False,'circlemarker':False, 'marker':False}).add_to(geomap)
-                    folium.TileLayer(tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-                                     attr='Esri', name='Esri Satellite', overlay=False, control=True).add_to(geomap)
-            except Exception:
-                st.warning("Address lookup failed")
+            st.info("📋 Using cached result (no API call needed)")
+
+    # Display cached results if available
+    if st.session_state['cached_geocode_result']:
+        cached_result = st.session_state['cached_geocode_result']
+        
+        if cached_result['type'] == 'ip':
+            ip_res = cached_result['data']
+            user_geo_input = cached_result['input']
+            
+            # Format geocoder response for better readability
+            st.write("**IP Geolocation Results - Location represents an estimated geographic area and does not indicate the point of usage.**")
+            
+            # Create organized display of key information
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.write("**Location Information:**")
+                location_info = {
+                    "IP Address": getattr(ip_res, 'ip', user_geo_input),
+                    "City": getattr(ip_res, 'city', 'Not available'),
+                    "State/Region": getattr(ip_res, 'state', 'Not available'), 
+                    "Country": getattr(ip_res, 'country', 'Not available'),
+                    "Postal Code": getattr(ip_res, 'postal', 'Not available'),
+                    "Coordinates": f"{ip_res.latlng[0]:.6f}, {ip_res.latlng[1]:.6f}",
+                    "Timezone": getattr(ip_res, 'timezone', 'Not available')
+                }
+                for key, value in location_info.items():
+                    st.write(f"• **{key}:** {value}")
+            
+            with col2:
+                st.write("**🌐 Network Information:**")
+                network_info = {
+                    "Organization": getattr(ip_res, 'org', 'Not available'),
+                    "Status": getattr(ip_res, 'status', 'Unknown'),
+                    "Provider": ip_res.provider if hasattr(ip_res, 'provider') else 'ipinfo.io'
+                }
+                for key, value in network_info.items():
+                    st.write(f"• **{key}:** {value}")
+            
+            # Show raw data in an expandable section
+            with st.expander("🔧 Raw Geocoder Data (Debug)"):
+                # Show all available attributes in a more organized way
+                all_attrs = {}
+                for attr in dir(ip_res):
+                    if not attr.startswith('_'):
+                        try:
+                            value = getattr(ip_res, attr)
+                            if not callable(value):
+                                all_attrs[attr] = value
+                        except:
+                            pass
+                st.json(all_attrs)
+            
+            # Rebuild map centered on result
+            geomap = folium.Map(location=ip_res.latlng, zoom_start=11)
+            Draw(export=True, draw_options={'circle': False,'circlemarker':False, 'marker':False}).add_to(geomap)
+            folium.TileLayer(tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                             attr='Esri', name='Esri Satellite', overlay=False, control=True).add_to(geomap)
+            folium.LayerControl(position="topright", collapsed=True).add_to(geomap)
+            
+            # Create enhanced popup with correct field names
+            popup_content = f"""
+            <div style="width: 350px; font-family: Arial, sans-serif;">
+                <h4 style="margin: 0 0 10px 0; color: #2c3e50;">🌐 IP Geolocation Details</h4>
+                <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                    <tr style="background-color: #f8f9fa;"><td style="font-weight: bold; padding: 5px; border: 1px solid #dee2e6;">IP Address:</td><td style="padding: 5px; border: 1px solid #dee2e6;">{getattr(ip_res, 'ip', user_geo_input)}</td></tr>
+                    <tr><td style="font-weight: bold; padding: 5px; border: 1px solid #dee2e6;">Location:</td><td style="padding: 5px; border: 1px solid #dee2e6;">{getattr(ip_res, 'city', 'Unknown')}, {getattr(ip_res, 'state', 'Unknown')}</td></tr>
+                    <tr style="background-color: #f8f9fa;"><td style="font-weight: bold; padding: 5px; border: 1px solid #dee2e6;">Country:</td><td style="padding: 5px; border: 1px solid #dee2e6;">{getattr(ip_res, 'country', 'Unknown')}</td></tr>
+                    <tr><td style="font-weight: bold; padding: 5px; border: 1px solid #dee2e6;">Postal Code:</td><td style="padding: 5px; border: 1px solid #dee2e6;">{getattr(ip_res, 'postal', 'N/A')}</td></tr>
+                    <tr style="background-color: #f8f9fa;"><td style="font-weight: bold; padding: 5px; border: 1px solid #dee2e6;">Coordinates:</td><td style="padding: 5px; border: 1px solid #dee2e6;">{ip_res.latlng[0]:.6f}, {ip_res.latlng[1]:.6f}</td></tr>
+                    <tr><td style="font-weight: bold; padding: 5px; border: 1px solid #dee2e6;">Organization:</td><td style="padding: 5px; border: 1px solid #dee2e6;">{getattr(ip_res, 'org', 'Unknown')}</td></tr>
+                    <tr style="background-color: #f8f9fa;"><td style="font-weight: bold; padding: 5px; border: 1px solid #dee2e6;">Timezone:</td><td style="padding: 5px; border: 1px solid #dee2e6;">{getattr(ip_res, 'timezone', 'Unknown')}</td></tr>
+                </table>
+                <div style="margin-top: 8px; font-size: 11px; color: #6c757d; text-align: center;">
+                    Data provided by {getattr(ip_res, 'provider', 'ipinfo.io')}
+                </div>
+            </div>
+            """
+            
+            # Add enhanced marker
+            folium.Marker(
+                location=ip_res.latlng, 
+                tooltip=f"🌐 {getattr(ip_res, 'ip', user_geo_input)} - {getattr(ip_res, 'city', 'Unknown')}, {getattr(ip_res, 'state', 'Unknown')}",
+                popup=folium.Popup(popup_content, max_width=400),
+                icon=folium.Icon(color='blue', icon='info-sign')
+            ).add_to(geomap)
+
+            
+        elif cached_result['type'] == 'address':
+            geo_res = cached_result['data']
+            user_geo_input = cached_result['input']
+            
+            # Format geocoder response for better readability
+            st.write("**🔍 Address Geolocation Results:**")
+            
+            # Create organized display of key information
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.write("**📍 Location Information:**")
+                location_info = {
+                    "Search Term": user_geo_input,
+                    "Full Address": getattr(geo_res, 'address', 'Not available'),
+                    "City": getattr(geo_res, 'city', 'Not available'),
+                    "State": getattr(geo_res, 'state', 'Not available'),
+                    "Country": getattr(geo_res, 'country', 'Not available'),
+                    "Postal Code": getattr(geo_res, 'postal', 'Not available'),
+                    "Coordinates": f"{geo_res.latlng[0]:.6f}, {geo_res.latlng[1]:.6f}"
+                }
+                for key, value in location_info.items():
+                    st.write(f"• **{key}:** {value}")
+            
+            with col2:
+                st.write("**🎯 Accuracy Information:**")
+                accuracy_info = {
+                    "Confidence": getattr(geo_res, 'confidence', 'Not available'),
+                    "Provider": geo_res.provider if hasattr(geo_res, 'provider') else 'ArcGIS',
+                    "Status": getattr(geo_res, 'status', 'Unknown')
+                }
+                for key, value in accuracy_info.items():
+                    st.write(f"• **{key}:** {value}")
+            
+            # Show raw data in an expandable section
+            with st.expander("🔧 Raw Geocoder Data (Debug)"):
+                all_attrs = {}
+                for attr in dir(geo_res):
+                    if not attr.startswith('_'):
+                        try:
+                            value = getattr(geo_res, attr)
+                            if not callable(value):
+                                all_attrs[attr] = value
+                        except:
+                            pass
+                st.json(all_attrs)
+            
+            geomap = folium.Map(location=geo_res.latlng, zoom_start=16)
+            Draw(export=True, draw_options={'circle': False,'circlemarker':False, 'marker':False}).add_to(geomap)
+            folium.TileLayer(tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                             attr='Esri', name='Esri Satellite', overlay=False, control=True).add_to(geomap)
+            folium.LayerControl(position="topright", collapsed=True).add_to(geomap)
+            
+            # Create enhanced popup for address
+            popup_content = f"""
+            <div style="width: 350px; font-family: Arial, sans-serif;">
+                <h4 style="margin: 0 0 10px 0; color: #2c3e50;">📍 Address Details</h4>
+                <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                    <tr style="background-color: #f8f9fa;"><td style="font-weight: bold; padding: 5px; border: 1px solid #dee2e6;">Search Term:</td><td style="padding: 5px; border: 1px solid #dee2e6;">{user_geo_input}</td></tr>
+                    <tr><td style="font-weight: bold; padding: 5px; border: 1px solid #dee2e6;">Full Address:</td><td style="padding: 5px; border: 1px solid #dee2e6;">{getattr(geo_res, 'address', 'Not available')}</td></tr>
+                    <tr style="background-color: #f8f9fa;"><td style="font-weight: bold; padding: 5px; border: 1px solid #dee2e6;">City:</td><td style="padding: 5px; border: 1px solid #dee2e6;">{getattr(geo_res, 'city', 'Unknown')}</td></tr>
+                    <tr><td style="font-weight: bold; padding: 5px; border: 1px solid #dee2e6;">State:</td><td style="padding: 5px; border: 1px solid #dee2e6;">{getattr(geo_res, 'state', 'Unknown')}</td></tr>
+                    <tr style="background-color: #f8f9fa;"><td style="font-weight: bold; padding: 5px; border: 1px solid #dee2e6;">Country:</td><td style="padding: 5px; border: 1px solid #dee2e6;">{getattr(geo_res, 'country', 'Unknown')}</td></tr>
+                    <tr><td style="font-weight: bold; padding: 5px; border: 1px solid #dee2e6;">Postal Code:</td><td style="padding: 5px; border: 1px solid #dee2e6;">{getattr(geo_res, 'postal', 'N/A')}</td></tr>
+                    <tr style="background-color: #f8f9fa;"><td style="font-weight: bold; padding: 5px; border: 1px solid #dee2e6;">Coordinates:</td><td style="padding: 5px; border: 1px solid #dee2e6;">{geo_res.latlng[0]:.6f}, {geo_res.latlng[1]:.6f}</td></tr>
+                    <tr><td style="font-weight: bold; padding: 5px; border: 1px solid #dee2e6;">Confidence:</td><td style="padding: 5px; border: 1px solid #dee2e6;">{getattr(geo_res, 'confidence', 'Unknown')}</td></tr>
+                </table>
+                <div style="margin-top: 8px; font-size: 11px; color: #6c757d; text-align: center;">
+                    Data provided by {getattr(geo_res, 'provider', 'ArcGIS')}
+                </div>
+            </div>
+            """
+            
+            # Add enhanced marker
+            folium.Marker(
+                location=geo_res.latlng, 
+                tooltip=f"📍 {getattr(geo_res, 'address', user_geo_input)}",
+                popup=folium.Popup(popup_content, max_width=400),
+                icon=folium.Icon(color='red', icon='map-marker')
+            ).add_to(geomap)
             
         
     # Render existing saved geofences
