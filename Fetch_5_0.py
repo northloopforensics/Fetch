@@ -484,53 +484,53 @@ def make_geofence_map():
     if search and user_geo_input:
         ipv4_ipv6_regex = "(^\s*((([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5]))\s*$)|(^\s*((([0-9A-Fa-f]{1,4}:){7}([0-9A-Fa-f]{1,4}|:))|(([0-9A-Fa-f]{1,4}:){6}(:[0-9A-Fa-f]{1,4}|((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:){5}(((:[0-9A-Fa-f]{1,4}){1,2})|:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:){4}(((:[0-9A-Fa-f]{1,4}){1,3})|((:[0-9A-Fa-f]{1,4})?:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){3}(((:[0-9A-Fa-f]{1,4}){1,4})|((:[0-9A-Fa-f]{1,4}){0,2}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){2}(((:[0-9A-Fa-f]{1,4}){1,5})|((:[0-9A-Fa-f]{1,4}){0,3}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){1}(((:[0-9A-Fa-f]{1,4}){1,6})|((:[0-9A-Fa-f]{1,4}){0,4}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(:(((:[0-9A-Fa-f]{1,4}){1,7})|((:[0-9A-Fa-f]{1,4}){0,5}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:)))(%.+)?\s*$)"
         
-    # Check if we need to make a new API call
-    # Use .get() to avoid KeyError if cached_search_term is missing between reruns
-    if user_geo_input != st.session_state.get('cached_search_term'):
-        if re.search(ipv4_ipv6_regex, user_geo_input):
-            try:
-                st.info("🔍 Looking up IP address... (API call)")
-                ip_res = geocoder.ipinfo(user_geo_input)
-                if ip_res and ip_res.latlng:
-                    # Cache the successful result
-                    st.session_state['cached_geocode_result'] = {
-                        'type': 'ip',
-                        'data': ip_res,
-                        'input': user_geo_input
-                    }
-                    st.session_state['cached_search_term'] = user_geo_input
-                    st.success("✅ IP address located successfully!")
-                else:
-                    st.error("❌ Could not locate IP address")
+        # Check if we need to make a new API call
+        # Use .get() to avoid KeyError if cached_search_term is missing between reruns
+        if user_geo_input != st.session_state.get('cached_search_term'):
+            if re.search(ipv4_ipv6_regex, user_geo_input):
+                try:
+                    st.info("🔍 Looking up IP address... (API call)")
+                    ip_res = geocoder.ipinfo(user_geo_input)
+                    if ip_res and ip_res.latlng:
+                        # Cache the successful result
+                        st.session_state['cached_geocode_result'] = {
+                            'type': 'ip',
+                            'data': ip_res,
+                            'input': user_geo_input
+                        }
+                        st.session_state['cached_search_term'] = user_geo_input
+                        st.success("✅ IP address located successfully!")
+                    else:
+                        st.error("❌ Could not locate IP address")
+                        st.session_state['cached_geocode_result'] = None
+                        st.session_state['cached_search_term'] = None
+                except Exception as e:
+                    st.error(f"❌ IP lookup failed: {str(e)}")
                     st.session_state['cached_geocode_result'] = None
                     st.session_state['cached_search_term'] = None
-            except Exception as e:
-                st.error(f"❌ IP lookup failed: {str(e)}")
-                st.session_state['cached_geocode_result'] = None
-                st.session_state['cached_search_term'] = None
+            else:
+                try:
+                    st.info("🔍 Looking up address... (API call)")
+                    geo_res = geocoder.arcgis(user_geo_input)
+                    if geo_res and geo_res.latlng:
+                        # Cache the successful result
+                        st.session_state['cached_geocode_result'] = {
+                            'type': 'address',
+                            'data': geo_res,
+                            'input': user_geo_input
+                        }
+                        st.session_state['cached_search_term'] = user_geo_input
+                        st.success("✅ Address located successfully!")
+                    else:
+                        st.error("❌ Could not locate address")
+                        st.session_state['cached_geocode_result'] = None
+                        st.session_state['cached_search_term'] = None
+                except Exception as e:
+                    st.error(f"❌ Address lookup failed: {str(e)}")
+                    st.session_state['cached_geocode_result'] = None
+                    st.session_state['cached_search_term'] = None
         else:
-            try:
-                st.info("🔍 Looking up address... (API call)")
-                geo_res = geocoder.arcgis(user_geo_input)
-                if geo_res and geo_res.latlng:
-                    # Cache the successful result
-                    st.session_state['cached_geocode_result'] = {
-                        'type': 'address',
-                        'data': geo_res,
-                        'input': user_geo_input
-                    }
-                    st.session_state['cached_search_term'] = user_geo_input
-                    st.success("✅ Address located successfully!")
-                else:
-                    st.error("❌ Could not locate address")
-                    st.session_state['cached_geocode_result'] = None
-                    st.session_state['cached_search_term'] = None
-            except Exception as e:
-                st.error(f"❌ Address lookup failed: {str(e)}")
-                st.session_state['cached_geocode_result'] = None
-                st.session_state['cached_search_term'] = None
-    else:
-        st.info("📋 Using cached result (no API call needed)")
+            st.info("📋 Using cached result (no API call needed)")
 
     # Display cached results if available (use .get() to avoid KeyError)
     if st.session_state.get('cached_geocode_result'):
