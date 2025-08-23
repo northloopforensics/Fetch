@@ -32,6 +32,21 @@ except ImportError:
     pytz = None
 import hashlib
 
+# Safe session-state helpers: using st.session_state before Streamlit initializes
+# can raise runtime errors in some reload/timing scenarios. These wrappers
+# catch those exceptions and provide safe fallbacks.
+def safe_session_get(key, default=None):
+    try:
+        return st.session_state.get(key, default)
+    except Exception:
+        return default
+
+def safe_session_set(key, value):
+    try:
+        st.session_state[key] = value
+    except Exception:
+        pass
+
 # -------------------------------------------------------------
 # Performance/Stability Helpers (added v5 PERF)
 # -------------------------------------------------------------
@@ -446,10 +461,10 @@ def get_point_at_distance(lat1, lon1, d, bearing, R=6371):  # used to draw tower
 
 def make_geofence_map():
     # --- Geofence Manager State ---
-    if 'geofences' not in st.session_state:
-        st.session_state['geofences'] = []  # list of dicts: id,name,color,geometry(type,wkt),created,updated,active,notes
-    if 'geofence_counter' not in st.session_state:
-        st.session_state['geofence_counter'] = 1
+    if safe_session_get('geofences') is None:
+        safe_session_set('geofences', [])  # list of dicts: id,name,color,geometry(type,wkt),created,updated,active,notes
+    if safe_session_get('geofence_counter') is None:
+        safe_session_set('geofence_counter', 1)
 
     help_Box = st.expander(label="Help")
     with help_Box:
@@ -467,10 +482,10 @@ def make_geofence_map():
         search = st.form_submit_button("Locate")
 
     # Initialize session state for caching geocoding results
-    if 'cached_geocode_result' not in st.session_state:
-        st.session_state['cached_geocode_result'] = None
-    if 'cached_search_term' not in st.session_state:
-        st.session_state['cached_search_term'] = None
+    if safe_session_get('cached_geocode_result') is None:
+        safe_session_set('cached_geocode_result', None)
+    if safe_session_get('cached_search_term') is None:
+        safe_session_set('cached_search_term', None)
 
     global geomap
     # Initialize with neutral continental US view; we'll optionally recenter below
@@ -483,58 +498,58 @@ def make_geofence_map():
     # Geocode/IP locate - Only run when search button is clicked
     if search and user_geo_input:
         ipv4_ipv6_regex = "(^\s*((([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5]))\s*$)|(^\s*((([0-9A-Fa-f]{1,4}:){7}([0-9A-Fa-f]{1,4}|:))|(([0-9A-Fa-f]{1,4}:){6}(:[0-9A-Fa-f]{1,4}|((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:){5}(((:[0-9A-Fa-f]{1,4}){1,2})|:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:){4}(((:[0-9A-Fa-f]{1,4}){1,3})|((:[0-9A-Fa-f]{1,4})?:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){3}(((:[0-9A-Fa-f]{1,4}){1,4})|((:[0-9A-Fa-f]{1,4}){0,2}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){2}(((:[0-9A-Fa-f]{1,4}){1,5})|((:[0-9A-Fa-f]{1,4}){0,3}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){1}(((:[0-9A-Fa-f]{1,4}){1,6})|((:[0-9A-Fa-f]{1,4}){0,4}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(:(((:[0-9A-Fa-f]{1,4}){1,7})|((:[0-9A-Fa-f]{1,4}){0,5}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:)))(%.+)?\s*$)"
-        
+
         # Check if we need to make a new API call
-        # Use .get() to avoid KeyError if cached_search_term is missing between reruns
-        if user_geo_input != st.session_state.get('cached_search_term'):
+        # Use safe_session_get to avoid KeyError if cached_search_term is missing between reruns
+        if user_geo_input != safe_session_get('cached_search_term'):
             if re.search(ipv4_ipv6_regex, user_geo_input):
                 try:
                     st.info("🔍 Looking up IP address... (API call)")
                     ip_res = geocoder.ipinfo(user_geo_input)
                     if ip_res and ip_res.latlng:
                         # Cache the successful result
-                        st.session_state['cached_geocode_result'] = {
+                        safe_session_set('cached_geocode_result', {
                             'type': 'ip',
                             'data': ip_res,
                             'input': user_geo_input
-                        }
-                        st.session_state['cached_search_term'] = user_geo_input
+                        })
+                        safe_session_set('cached_search_term', user_geo_input)
                         st.success("✅ IP address located successfully!")
                     else:
                         st.error("❌ Could not locate IP address")
-                        st.session_state['cached_geocode_result'] = None
-                        st.session_state['cached_search_term'] = None
+                        safe_session_set('cached_geocode_result', None)
+                        safe_session_set('cached_search_term', None)
                 except Exception as e:
                     st.error(f"❌ IP lookup failed: {str(e)}")
-                    st.session_state['cached_geocode_result'] = None
-                    st.session_state['cached_search_term'] = None
+                    safe_session_set('cached_geocode_result', None)
+                    safe_session_set('cached_search_term', None)
             else:
                 try:
                     st.info("🔍 Looking up address... (API call)")
                     geo_res = geocoder.arcgis(user_geo_input)
                     if geo_res and geo_res.latlng:
                         # Cache the successful result
-                        st.session_state['cached_geocode_result'] = {
+                        safe_session_set('cached_geocode_result', {
                             'type': 'address',
                             'data': geo_res,
                             'input': user_geo_input
-                        }
-                        st.session_state['cached_search_term'] = user_geo_input
+                        })
+                        safe_session_set('cached_search_term', user_geo_input)
                         st.success("✅ Address located successfully!")
                     else:
                         st.error("❌ Could not locate address")
-                        st.session_state['cached_geocode_result'] = None
-                        st.session_state['cached_search_term'] = None
+                        safe_session_set('cached_geocode_result', None)
+                        safe_session_set('cached_search_term', None)
                 except Exception as e:
                     st.error(f"❌ Address lookup failed: {str(e)}")
-                    st.session_state['cached_geocode_result'] = None
-                    st.session_state['cached_search_term'] = None
+                    safe_session_set('cached_geocode_result', None)
+                    safe_session_set('cached_search_term', None)
         else:
             st.info("📋 Using cached result (no API call needed)")
 
     # Display cached results if available (use .get() to avoid KeyError)
-    if st.session_state.get('cached_geocode_result'):
-        cached_result = st.session_state.get('cached_geocode_result')
+    if safe_session_get('cached_geocode_result'):
+        cached_result = safe_session_get('cached_geocode_result')
         
         if cached_result['type'] == 'ip':
             ip_res = cached_result['data']
@@ -703,9 +718,9 @@ def make_geofence_map():
         
     # Render existing saved geofences
     bounds_points = []
-    if st.session_state.get('geofences'):
-        # iterate over a safe default list to avoid KeyError if key disappears
-        for g in st.session_state.get('geofences', []):
+    geofences_list = safe_session_get('geofences') or []
+    if geofences_list:
+        for g in geofences_list:
             if not g.get('active'):  # skip inactive
                 continue
             try:
@@ -743,9 +758,9 @@ def make_geofence_map():
     # Include current drawing in bounds
     last_geojson_temp = None
     try:
-        last_geojson_temp = st.session_state.get('last_drawn_raw')
+        last_geojson_temp = safe_session_get('last_drawn_raw')
     except Exception:
-        pass
+        last_geojson_temp = None
 
     # Fallback: attempt to get from current output later; we will set after outputmap if needed.
     
@@ -754,7 +769,7 @@ def make_geofence_map():
     # Capture last drawn geometry
     last_geojson = outputmap.get('last_active_drawing') if outputmap else None
     if last_geojson:
-        st.session_state['last_drawn_raw'] = last_geojson
+        safe_session_set('last_drawn_raw', last_geojson)
         # Update bounds with current drawing
         try:
             g_t = last_geojson.get('geometry', {}).get('type')
@@ -965,7 +980,7 @@ def make_IPaddress_Map():   #used to map ips
             ipmap.to_streamlit()
             # Record the last rendered map type so the unified download button can choose the correct exporter
             try:
-                st.session_state['last_map_type'] = 'leaflet'
+                safe_session_set('last_map_type', 'leaflet')
             except Exception:
                 pass
             downloadfile = ipmap.to_html()               # for downloads
@@ -1034,8 +1049,8 @@ def make_map(in_df):       #bring in pandas dataframe
             help="If checked, any points farther than the chosen radius from a hotspot's centroid are removed (prevents elongated 'snake' clusters)."
         )
         run_cluster = st.button("Run Hotspot Analysis")
-        if 'hotspot_store' not in st.session_state:
-            st.session_state['hotspot_store'] = None
+        if safe_session_get('hotspot_store') is None:
+            safe_session_set('hotspot_store', None)
         param_key = f"r{radius_m}_m{min_samples}_t{time_col}_max{max_hotspots}_trim{trim_chaining}"
         clusters_df = pandas.DataFrame(); summary_df = pandas.DataFrame()
         if run_cluster:
@@ -1045,7 +1060,7 @@ def make_map(in_df):       #bring in pandas dataframe
                 st.error(str(e))
             except Exception as e:
                 st.error(f"Hotspot clustering error: {e}")
-            st.session_state['hotspot_store'] = {
+            safe_session_set('hotspot_store', {
                 'params': param_key,
                 'clusters': clusters_df,
                 'summary': summary_df,
@@ -1054,9 +1069,9 @@ def make_map(in_df):       #bring in pandas dataframe
                 'time_col': time_col,
                 'max_hotspots': max_hotspots,
                 'trim_chaining': trim_chaining
-            }
+            })
         else:
-            store = st.session_state.get('hotspot_store')
+            store = safe_session_get('hotspot_store')
             if store and store.get('params') == param_key:
                 clusters_df = store.get('clusters', pandas.DataFrame())
                 summary_df = store.get('summary', pandas.DataFrame())
@@ -1107,7 +1122,7 @@ def make_map(in_df):       #bring in pandas dataframe
                     file_name="Fetch_Hotspots_All.csv"
                 )
             if st.button("Clear Hotspots", type="secondary"):
-                st.session_state['hotspot_store'] = None
+                safe_session_set('hotspot_store', None)
                 st.experimental_rerun()
             palette = ["red","blue","green","orange","purple","teal","pink","yellow","white","gray","cadetblue","darkred","darkblue","darkgreen"]
             # --- Center & zoom based on hotspot CENTERS (ignoring any outlier member points) ---
@@ -1183,7 +1198,10 @@ def make_map(in_df):       #bring in pandas dataframe
             # Render the map here (above clocks) once hotspots & optional points are drawn
             Map.to_streamlit()
             try:
-                st.session_state['last_map_type'] = 'leaflet'
+                try:
+                    safe_session_set('last_map_type', 'leaflet')
+                except Exception:
+                    pass
             except Exception:
                 pass
             map_rendered = True
@@ -1277,7 +1295,10 @@ def make_map(in_df):       #bring in pandas dataframe
                     # Immediately render to avoid waiting for final fallback (gives user instant feedback)
                     Map.to_streamlit()
                     try:
-                        st.session_state['last_map_type'] = 'leaflet'
+                        try:
+                            safe_session_set('last_map_type', 'leaflet')
+                        except Exception:
+                            pass
                     except Exception:
                         pass
                 except Exception as e:
@@ -1929,8 +1950,8 @@ def make_map(in_df):       #bring in pandas dataframe
                         # Persist payload and config so we can rebuild KeplerGl later
                         try:
                             if isinstance(data_payload, dict) and isinstance(kepler_config, dict):
-                                st.session_state['kepler_data_payload'] = data_payload
-                                st.session_state['kepler_config'] = kepler_config
+                                safe_session_set('kepler_data_payload', data_payload)
+                                safe_session_set('kepler_config', kepler_config)
                             else:
                                 # Avoid storing malformed payloads (e.g., strings) into session
                                 st.warning("Kepler payload/config not persisted because structure is unexpected.")
@@ -1939,7 +1960,7 @@ def make_map(in_df):       #bring in pandas dataframe
                         # Optional debug output: show session payload type/summary
                         try:
                             if show_kepler_debug:
-                                preview = st.session_state.get('kepler_data_payload', data_payload if 'data_payload' in locals() else None)
+                                preview = safe_session_get('kepler_data_payload', data_payload if 'data_payload' in locals() else None)
                                 st.write("Kepler payload type:", type(preview))
                                 if isinstance(preview, dict):
                                     st.write("Kepler payload keys:", list(preview.keys()))
@@ -1962,7 +1983,10 @@ def make_map(in_df):       #bring in pandas dataframe
                         st.components.v1.html(html, height=650, scrolling=True)
                         # Record that the last rendered map was a Kepler map
                         try:
-                            st.session_state['last_map_type'] = 'kepler'
+                            try:
+                                safe_session_set('last_map_type', 'kepler')
+                            except Exception:
+                                pass
                         except Exception:
                             pass
                         # Per-map download button for this Kepler render: build an HTML file from
@@ -1981,8 +2005,8 @@ def make_map(in_df):       #bring in pandas dataframe
                                     tmp.close()
 
                                     # Prefer persisted payload/config from session state
-                                    kp_payload = st.session_state.get('kepler_data_payload') if 'kepler_data_payload' in st.session_state else (data_payload if 'data_payload' in locals() else None)
-                                    kp_config = st.session_state.get('kepler_config') if 'kepler_config' in st.session_state else (kepler_config if 'kepler_config' in locals() else None)
+                                    kp_payload = safe_session_get('kepler_data_payload') if safe_session_get('kepler_data_payload') is not None else (data_payload if 'data_payload' in locals() else None)
+                                    kp_config = safe_session_get('kepler_config') if safe_session_get('kepler_config') is not None else (kepler_config if 'kepler_config' in locals() else None)
 
                                     wrote_ok = False
                                     try:
@@ -2054,7 +2078,10 @@ def make_map(in_df):       #bring in pandas dataframe
                                 kepler_html = fh.read()
                             st.components.v1.html(kepler_html, height=650, scrolling=True)
                             try:
-                                st.session_state['last_map_type'] = 'kepler'
+                                try:
+                                    safe_session_set('last_map_type', 'kepler')
+                                except Exception:
+                                    pass
                             except Exception:
                                 pass
                             map_rendered = True
@@ -3463,8 +3490,8 @@ if combined_df is not None:
             # Derive the same deterministic key used when the uploader created the picker
             _digest = hashlib.md5(file_name.encode()).hexdigest()
             color_picker_key = f"color_picker_{_digest}"
-            if color_picker_key in st.session_state:
-                current_color = st.session_state[color_picker_key]
+            if safe_session_get(color_picker_key) is not None:
+                current_color = safe_session_get(color_picker_key)
                 # Update the color for this file in the dataframe
                 file_mask = combined_df['SOURCE_FILE'] == file_name
                 combined_df.loc[file_mask, 'POINT_COLOR'] = current_color
@@ -3806,8 +3833,11 @@ if preview_data is not None:
                             
                             st.success(success_message)
                             # Prevent an infinite rerun loop by only rerunning once per conversion action
-                            if not st.session_state.get('_tz_conversion_rerun_done'):
-                                st.session_state['_tz_conversion_rerun_done'] = True
+                            if not safe_session_get('_tz_conversion_rerun_done'):
+                                try:
+                                    safe_session_set('_tz_conversion_rerun_done', True)
+                                except Exception:
+                                    pass
                                 st.rerun()
                             
                     except Exception as e:
@@ -3897,8 +3927,11 @@ if preview_data is not None:
     with tab3:
         make_geofence_map()
     # Reset one-shot rerun guard so future timezone conversions can trigger a rerun again
-    if st.session_state.get('_tz_conversion_rerun_done'):
-        st.session_state['_tz_conversion_rerun_done'] = False
+    if safe_session_get('_tz_conversion_rerun_done'):
+        try:
+            safe_session_set('_tz_conversion_rerun_done', False)
+        except Exception:
+            pass
     
 # add a button to open a popup window that will contain hyperlinks
 st.markdown("---")
