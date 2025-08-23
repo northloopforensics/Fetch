@@ -3805,7 +3805,10 @@ if preview_data is not None:
                             preview_data = converted_data
                             
                             st.success(success_message)
-                            st.rerun()
+                            # Prevent an infinite rerun loop by only rerunning once per conversion action
+                            if not st.session_state.get('_tz_conversion_rerun_done'):
+                                st.session_state['_tz_conversion_rerun_done'] = True
+                                st.rerun()
                             
                     except Exception as e:
                         st.error(f"Error during conversion: {str(e)}")
@@ -3893,6 +3896,9 @@ if preview_data is not None:
             st.error("Check that your data has Latitude and Longitude columns")
     with tab3:
         make_geofence_map()
+    # Reset one-shot rerun guard so future timezone conversions can trigger a rerun again
+    if st.session_state.get('_tz_conversion_rerun_done'):
+        st.session_state['_tz_conversion_rerun_done'] = False
     
 # add a button to open a popup window that will contain hyperlinks
 st.markdown("---")
