@@ -30,6 +30,7 @@ try:
     import pytz
 except ImportError:
     pytz = None
+import hashlib
 
 # -------------------------------------------------------------
 # Performance/Stability Helpers (added v5 PERF)
@@ -105,7 +106,9 @@ hide_streamlit_style = """
             footer {visibility: hidden;}
             </style>
             """
-st.markdown(hide_streamlit_style, unsafe_allow_html=True) 
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
+# Top-level Kepler export button removed. Use the Kepler download button shown below the embedded map.
 
 ### Global Variables ###
 get_headings = ""
@@ -958,6 +961,11 @@ def make_IPaddress_Map():   #used to map ips
         try:
             circle_Points = ipmap.add_circle_markers_from_xy(data=gdf, x="LONGITUDE", y="LATITUDE",color="Yellow",fill_color="Yellow", radius=5)
             ipmap.to_streamlit()
+            # Record the last rendered map type so the unified download button can choose the correct exporter
+            try:
+                st.session_state['last_map_type'] = 'leaflet'
+            except Exception:
+                pass
             downloadfile = ipmap.to_html()               # for downloads
             download_test = st.download_button(label="Download HTML Map", data=downloadfile,file_name="Fetch_Analysis_Map.html")
         except UnboundLocalError:
@@ -1172,6 +1180,10 @@ def make_map(in_df):       #bring in pandas dataframe
             st.markdown("**Tips:** Increase radius if visits are a few dozen meters apart; decrease radius for tighter grouping.")
             # Render the map here (above clocks) once hotspots & optional points are drawn
             Map.to_streamlit()
+            try:
+                st.session_state['last_map_type'] = 'leaflet'
+            except Exception:
+                pass
             map_rendered = True
 
             if time_col:
@@ -1262,6 +1274,10 @@ def make_map(in_df):       #bring in pandas dataframe
                     map_rendered = True
                     # Immediately render to avoid waiting for final fallback (gives user instant feedback)
                     Map.to_streamlit()
+                    try:
+                        st.session_state['last_map_type'] = 'leaflet'
+                    except Exception:
+                        pass
                 except Exception as e:
                     st.error(f"Heatmap error: {e}")
 
@@ -1312,6 +1328,34 @@ def make_map(in_df):       #bring in pandas dataframe
                             fill_color=row["POINT_COLOR"],
                             radius=5,
                         )
+                    # per-map legacy download suppressed here; a single download button
+                    # will be shown below the final rendered map instead.
+                    try:
+                        import tempfile, os, hashlib
+                        btn_col_left, _ = st.columns([1, 4])
+                        with btn_col_left:
+                            tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.html')
+                            tmp_name = tmp.name
+                            tmp.close()
+                            try:
+                                try:
+                                    Map.save(tmp_name)
+                                except Exception:
+                                    try:
+                                        with open(tmp_name, 'w', encoding='utf-8') as fh:
+                                            fh.write(Map.get_root().render())
+                                    except Exception:
+                                        pass
+
+                                # per-map markers_all download suppressed; final download button placed below the rendered map
+                            finally:
+                                try:
+                                    if os.path.exists(tmp_name):
+                                        os.unlink(tmp_name)
+                                except Exception:
+                                    pass
+                    except Exception:
+                        pass
 
                 else:
                     # Use color from color picker (stored in POINT_COLOR column)
@@ -1355,6 +1399,33 @@ def make_map(in_df):       #bring in pandas dataframe
                         radius=5,
                         z_index_offset=1000  # Higher z-index for markers
                     )
+                    # Per-map download button for this legacy Map render (Markers)
+                    try:
+                        import tempfile, os, hashlib
+                        btn_col_left, _ = st.columns([1, 4])
+                        with btn_col_left:
+                            tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.html')
+                            tmp_name = tmp.name
+                            tmp.close()
+                            try:
+                                try:
+                                    Map.save(tmp_name)
+                                except Exception:
+                                    try:
+                                        with open(tmp_name, 'w', encoding='utf-8') as fh:
+                                            fh.write(Map.get_root().render())
+                                    except Exception:
+                                        pass
+
+                                # legacy markers_all download suppressed (single download button shown after loop)
+                            finally:
+                                try:
+                                    if os.path.exists(tmp_name):
+                                        os.unlink(tmp_name)
+                                except Exception:
+                                    pass
+                    except Exception:
+                        pass
             # Kepler 3D option: interactive 3D map via keplergl
             if points_or_path == "Kepler 3D":
                 st.markdown("---")
@@ -1386,6 +1457,8 @@ def make_map(in_df):       #bring in pandas dataframe
                         cam_tilt = st.slider("Camera Tilt (deg)", min_value=0, max_value=85, value=45)
                     
                     cam_zoom = st.slider("Camera Zoom (0-20)", min_value=0, max_value=20, value=12)
+                    # Debug toggle to inspect persisted kepler payload in-session
+                    show_kepler_debug = st.checkbox("Show Kepler payload debug", value=False)
 
                 # Prepare dataframe for kepler
                 try:
@@ -1604,6 +1677,89 @@ def make_map(in_df):       #bring in pandas dataframe
                                 # ensure we still have a usable points dataframe
                                 points_df = points_df.loc[:, [c for c in points_df.columns if c != 'geometry']]
 
+                        # Sanitize object columns to avoid passing non-serializable types into keplergl
+                        try:
+                            import json as _json
+                            import numpy as _np
+                            for col in list(points_df.columns):
+                                if points_df[col].dtype == object:
+                                    # Inspect a sample
+                                    sample = None
+                                    try:
+                                        sample = points_df[col].dropna().iloc[0]
+                                    except Exception:
+                                        sample = None
+
+                                    # If sample is shapely geometry, drop the column
+                                    try:
+                                        from shapely.geometry.base import BaseGeometry
+                                        if isinstance(sample, BaseGeometry):
+                                            points_df = points_df.drop(columns=[col])
+                                            continue
+                                    except Exception:
+                                        pass
+
+                                    # If sample is a string that looks like a JSON/list/dict, try to parse it into a Python object
+                                    if isinstance(sample, str):
+                                        s = sample.strip()
+                                        if s and (s[0] in '[{('):
+                                            try:
+                                                parsed = _json.loads(s)
+                                                sample = parsed
+                                            except Exception:
+                                                try:
+                                                    import ast as _ast
+                                                    parsed = _ast.literal_eval(s)
+                                                    sample = parsed
+                                                except Exception:
+                                                    # leave as original string if parsing fails
+                                                    pass
+
+                                    # If sample is a list/tuple/ndarray of primitives (e.g. color arrays), keep as Python list
+                                    if isinstance(sample, (list, tuple, _np.ndarray)):
+                                        def _normalize_list(v):
+                                            if v is None:
+                                                return None
+                                            # If v is a stringified list, try to parse it first
+                                            if isinstance(v, str):
+                                                s2 = v.strip()
+                                                if s2 and (s2[0] in '[{('):
+                                                    try:
+                                                        v = _json.loads(s2)
+                                                    except Exception:
+                                                        try:
+                                                            import ast as _ast2
+                                                            v = _ast2.literal_eval(s2)
+                                                        except Exception:
+                                                            # leave as string and fall through to JSON-dump fallback
+                                                            pass
+
+                                            # convert numpy arrays to list
+                                            if isinstance(v, _np.ndarray):
+                                                try:
+                                                    v = v.tolist()
+                                                except Exception:
+                                                    return _json.dumps(v)
+                                            # If all items are primitives, return as list (keplergl wants lists for color arrays)
+                                            try:
+                                                if all(isinstance(x, (int, float, str, bool, type(None))) for x in v):
+                                                    return list(v)
+                                            except Exception:
+                                                pass
+                                            # Fallback: JSON-serialize complex nested structures
+                                            return _json.dumps(v)
+
+                                        points_df[col] = points_df[col].apply(_normalize_list)
+                                    elif isinstance(sample, dict):
+                                        # JSON-serialize dicts
+                                        points_df[col] = points_df[col].apply(lambda v: _json.dumps(v) if v is not None else None)
+                                    else:
+                                        # Fallback: coerce to primitive/string for safe serialization
+                                        points_df[col] = points_df[col].apply(lambda v: v if v is None or isinstance(v, (str, int, float, bool)) else str(v))
+                        except Exception:
+                            # If sanitization fails, proceed with original points_df (we already dropped geometry)
+                            pass
+
                         data_payload[dataset_name] = points_df
 
                         # Prepare radius circles dataset only if user enabled. We support:
@@ -1739,10 +1895,136 @@ def make_map(in_df):       #bring in pandas dataframe
                             kepler_config['config']['visState']['layers'] = [lay for lay in kepler_config['config']['visState']['layers'] if lay.get('id') != 'buildings']
 
                         # Instantiate Kepler with prepared payload
+                        # If debug enabled, inspect the 'points' DataFrame for problematic dtypes/values
+                        if show_kepler_debug:
+                            try:
+                                preview_df = data_payload.get(dataset_name) if isinstance(data_payload, dict) else None
+                                st.write('[Kepler debug] top-level payload type:', type(data_payload))
+                                if isinstance(preview_df, pandas.DataFrame):
+                                    st.write('[Kepler debug] points DataFrame shape:', preview_df.shape)
+                                    for col in preview_df.columns:
+                                        try:
+                                            col_dtype = str(preview_df[col].dtype)
+                                            nonnull = preview_df[col].dropna()
+                                            sample = nonnull.iloc[0] if len(nonnull) > 0 else None
+                                            sample_type = type(sample)
+                                            sample_repr = repr(sample)
+                                            st.write(f" - {col}: dtype={col_dtype}, sample_type={sample_type}, sample_repr={sample_repr[:200]}")
+                                            # detect shapely geometries or nested structures
+                                            try:
+                                                from shapely.geometry.base import BaseGeometry
+                                                if isinstance(sample, BaseGeometry):
+                                                    st.write(f"   -> column {col} contains shapely geometry objects; these should be removed or converted.")
+                                            except Exception:
+                                                pass
+                                        except Exception as e_ins:
+                                            st.write(f" - {col}: inspection error: {e_ins}")
+                                else:
+                                    st.write('[Kepler debug] points payload not a DataFrame:', type(preview_df))
+                            except Exception:
+                                pass
                         kepler_map = KeplerGl(height=600, data=data_payload, config=kepler_config)
+                        # Persist payload and config so we can rebuild KeplerGl later
+                        try:
+                            if isinstance(data_payload, dict) and isinstance(kepler_config, dict):
+                                st.session_state['kepler_data_payload'] = data_payload
+                                st.session_state['kepler_config'] = kepler_config
+                            else:
+                                # Avoid storing malformed payloads (e.g., strings) into session
+                                st.warning("Kepler payload/config not persisted because structure is unexpected.")
+                        except Exception:
+                            pass
+                        # Optional debug output: show session payload type/summary
+                        try:
+                            if show_kepler_debug:
+                                preview = st.session_state.get('kepler_data_payload', data_payload if 'data_payload' in locals() else None)
+                                st.write("Kepler payload type:", type(preview))
+                                if isinstance(preview, dict):
+                                    st.write("Kepler payload keys:", list(preview.keys()))
+                                    for k, v in preview.items():
+                                        try:
+                                            if hasattr(v, 'shape'):
+                                                st.write(f" - {k}: DataFrame shape={v.shape}")
+                                            else:
+                                                st.write(f" - {k}: {type(v)}")
+                                        except Exception:
+                                            st.write(f" - {k}: {type(v)}")
+                                elif isinstance(preview, str):
+                                    st.write(f"Kepler payload is a string (len={len(preview)}) -> exists on disk: {os.path.exists(preview)}")
+                                else:
+                                    st.write(repr(preview))
+                        except Exception:
+                            pass
                         # Render via HTML representation
                         html = kepler_map._repr_html_()
                         st.components.v1.html(html, height=650, scrolling=True)
+                        # Record that the last rendered map was a Kepler map
+                        try:
+                            st.session_state['last_map_type'] = 'kepler'
+                        except Exception:
+                            pass
+                        # Per-map download button for this Kepler render: build an HTML file from
+                        # the persisted kepler payload/config (preferred) or fall back to the
+                        # current kepler_map object, then offer it via st.download_button.
+                        try:
+                            import tempfile, os
+
+                            # Create a small two-column area so the button sits under the map on the left
+                            btn_col_left, _ = st.columns([1, 4])
+                            with btn_col_left:
+                                try:
+                                    # Build a temporary file and write the Kepler HTML into it.
+                                    tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.html')
+                                    tmp_name = tmp.name
+                                    tmp.close()
+
+                                    # Prefer persisted payload/config from session state
+                                    kp_payload = st.session_state.get('kepler_data_payload') if 'kepler_data_payload' in st.session_state else (data_payload if 'data_payload' in locals() else None)
+                                    kp_config = st.session_state.get('kepler_config') if 'kepler_config' in st.session_state else (kepler_config if 'kepler_config' in locals() else None)
+
+                                    wrote_ok = False
+                                    try:
+                                        # If we have a valid persisted payload+config, recreate and save
+                                        if isinstance(kp_payload, dict) and isinstance(kp_config, dict):
+                                            try:
+                                                tmp_map = KeplerGl(height=600, data=kp_payload, config=kp_config)
+                                                tmp_map.save_to_html(file_name=tmp_name)
+                                                wrote_ok = True
+                                            except Exception:
+                                                wrote_ok = False
+
+                                        # If that failed, try saving the in-memory kepler_map object
+                                        if not wrote_ok:
+                                            try:
+                                                kepler_map.save_to_html(file_name=tmp_name)
+                                                wrote_ok = True
+                                            except Exception:
+                                                wrote_ok = False
+
+                                        if wrote_ok:
+                                            with open(tmp_name, 'rb') as fh:
+                                                html_bytes = fh.read()
+                                            st.download_button(
+                                                label='Download Kepler HTML',
+                                                data=html_bytes,
+                                                file_name='kepler_map.html',
+                                                mime='text/html',
+                                                key='download_kepler_html'
+                                            )
+                                        else:
+                                            st.warning('Unable to build Kepler HTML for download at this time.')
+                                    finally:
+                                        try:
+                                            if os.path.exists(tmp_name):
+                                                os.unlink(tmp_name)
+                                        except Exception:
+                                            pass
+                                except Exception:
+                                    # Non-fatal: show nothing if download assembly fails
+                                    pass
+                        except Exception:
+                            pass
+
                         map_rendered = True
 
                     except Exception as e:
@@ -1751,14 +2033,28 @@ def make_map(in_df):       #bring in pandas dataframe
                             tmpfile = 'kepler_map.html'
                             # If kepler_map exists use it, otherwise try to construct minimal map
                             try:
-                                kepler_map.save_to_html(tmpfile)
+                                kepler_map.save_to_html(file_name=tmpfile)
                             except Exception:
-                                # Try instantiating with whatever data_payload we have
-                                kepler_map = KeplerGl(height=600, data=(data_payload if 'data_payload' in locals() else {dataset_name: kdf}), config=kepler_config)
-                                kepler_map.save_to_html(tmpfile)
+                                # Try instantiating with a validated payload
+                                safe_payload = None
+                                if 'data_payload' in locals() and isinstance(data_payload, dict):
+                                    safe_payload = data_payload
+                                elif 'kdf' in locals() and kdf is not None:
+                                    safe_payload = {dataset_name: kdf}
+
+                                if isinstance(safe_payload, dict) and isinstance(kepler_config, dict):
+                                    kepler_map = KeplerGl(height=600, data=safe_payload, config=kepler_config)
+                                    kepler_map.save_to_html(file_name=tmpfile)
+                                else:
+                                    raise RuntimeError('No valid kepler data payload available for fallback rendering.')
+
                             with open(tmpfile, 'r', encoding='utf-8') as fh:
                                 kepler_html = fh.read()
                             st.components.v1.html(kepler_html, height=650, scrolling=True)
+                            try:
+                                st.session_state['last_map_type'] = 'kepler'
+                            except Exception:
+                                pass
                             map_rendered = True
                         except Exception as e2:
                             st.error(f"Failed to render kepler map: {e} / {e2}")
@@ -1843,6 +2139,34 @@ def make_map(in_df):       #bring in pandas dataframe
                         ltlng2list = [float(value) for value in ltlng.split(",")]
                         pathpointforreal.append(ltlng2list)
                     plugins.AntPath(locations=pathpointforreal,color=color).add_to(Map)
+
+                # Per-map download button for the progression map
+                try:
+                    import tempfile, os, hashlib
+                    btn_col_left, _ = st.columns([1, 4])
+                    with btn_col_left:
+                        tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.html')
+                        tmp_name = tmp.name
+                        tmp.close()
+                        try:
+                            try:
+                                Map.save(tmp_name)
+                            except Exception:
+                                try:
+                                    with open(tmp_name, 'w', encoding='utf-8') as fh:
+                                        fh.write(Map.get_root().render())
+                                except Exception:
+                                    pass
+
+                            # per-map progression download suppressed; final download button will appear below the rendered map
+                        finally:
+                            try:
+                                if os.path.exists(tmp_name):
+                                    os.unlink(tmp_name)
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
 
             #   GOTTA ORDER THE DATAFRAME BY TIME AND DATE THEN ADD THE POINTS IN ORDER TO A LIST TO BE READ BY THE ANTPATH
 
@@ -1999,6 +2323,34 @@ def make_map(in_df):       #bring in pandas dataframe
                         st.error(f"Error creating vapor trail: {e}")
                 else:
                     st.warning("No valid data points found for creating vapor trail")
+
+                # Per-map download button for the Vapour Trail map
+                try:
+                    import tempfile, os, hashlib
+                    btn_col_left, _ = st.columns([1, 4])
+                    with btn_col_left:
+                        tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.html')
+                        tmp_name = tmp.name
+                        tmp.close()
+                        try:
+                            try:
+                                Map.save(tmp_name)
+                            except Exception:
+                                try:
+                                    with open(tmp_name, 'w', encoding='utf-8') as fh:
+                                        fh.write(Map.get_root().render())
+                                except Exception:
+                                    pass
+
+                            # per-map vapour_trail download suppressed; final download button will appear below the rendered map
+                        finally:
+                            try:
+                                if os.path.exists(tmp_name):
+                                    os.unlink(tmp_name)
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
             
         
     if map_Type == "Cell Sites":
@@ -2088,11 +2440,21 @@ def make_map(in_df):       #bring in pandas dataframe
     # Final fallback render if not already rendered earlier
     if not map_rendered:
         Map.to_streamlit()
-    
-    col1, col2, col3, col4, col5 = st.columns(5)
-    with col1:
-        downloadfile = Map.to_html()
-        st.download_button(label="Download HTML Map", data=downloadfile,file_name="Fetch_Analysis_Map.html")
+        # After rendering the final map, provide a single download button beneath it
+        try:
+            try:
+                downloadfile = Map.to_html()
+            except Exception:
+                # Some Map objects provide get_root().render(); try that
+                try:
+                    downloadfile = Map.get_root().render()
+                except Exception:
+                    downloadfile = None
+
+            if downloadfile is not None:
+                st.download_button(label="Download Map HTML", data=downloadfile, file_name="Fetch_Analysis_Map.html")
+        except Exception:
+            pass
         
 def get_footprint_color(icon_Color):
     if "Yellow" in icon_Color:
@@ -2941,10 +3303,13 @@ def ingest_multiple_files():
         for j, file in enumerate(uploaded_files[i:i+num_cols]):
             with cols[j]:
                 st.markdown(f"**{file.name}**")
+                # Use a deterministic, compact key derived from the filename to avoid Streamlit duplicate-key errors
+                _digest = hashlib.md5(file.name.encode()).hexdigest()
+                _cp_key = f"color_picker_{_digest}"
                 color_selections[file.name] = st.color_picker(
                     f"Select color for points in {file.name}", 
                     value="#FF0000", 
-                    key=f"color_picker_{file.name}"
+                    key=_cp_key
                 )    
     
     df_list = []
@@ -3093,8 +3458,9 @@ if combined_df is not None:
         unique_files = combined_df['SOURCE_FILE'].unique()
         
         for file_name in unique_files:
-            # Get current color picker value for this file
-            color_picker_key = f"color_picker_{file_name}"
+            # Derive the same deterministic key used when the uploader created the picker
+            _digest = hashlib.md5(file_name.encode()).hexdigest()
+            color_picker_key = f"color_picker_{_digest}"
             if color_picker_key in st.session_state:
                 current_color = st.session_state[color_picker_key]
                 # Update the color for this file in the dataframe
