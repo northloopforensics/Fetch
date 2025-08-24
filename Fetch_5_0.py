@@ -797,10 +797,43 @@ def make_geofence_map():
 
     # Fallback: attempt to get from current output later; we will set after outputmap if needed.
     
-    outputmap = st_folium(geomap, width=1100, height=600, key="geofence_map")
+    # Try to render interactive folium via streamlit_folium; if the component fails to load
+    # (common on deployments where the frontend component isn't available), fall back to
+    # embedding the map HTML. This avoids the "component failed to load" reset loop.
+    outputmap = None
+    try:
+        outputmap = st_folium(geomap, width=1100, height=600, key="geofence_map")
+    except Exception as e:
+        # Log the error for debugging but don't crash the app; render HTML fallback.
+        try:
+            st.warning("streamlit_folium component failed to load; falling back to static HTML rendering.")
+        except Exception:
+            pass
+        try:
+            # Render map HTML as a safe fallback. This won't provide the drawing callbacks
+            # that st_folium exposes, so we attempt to preserve the last drawn geometry
+            # from session_state instead of relying on the component.
+            html = geomap._repr_html_()
+            import streamlit.components.v1 as components
+            components.html(html, height=600, scrolling=True)
+        except Exception:
+            # If even HTML rendering fails, show a placeholder message.
+            try:
+                st.error("Unable to render the map via streamlit_folium or HTML fallback.")
+            except Exception:
+                pass
 
-    # Capture last drawn geometry
-    last_geojson = outputmap.get('last_active_drawing') if outputmap else None
+    # Capture last drawn geometry. If we used the HTML fallback, prefer the last stored drawing
+    # from session_state because the fallback doesn't provide live drawing callbacks.
+    last_geojson = None
+    try:
+        if isinstance(outputmap, dict):
+            last_geojson = outputmap.get('last_active_drawing')
+        if not last_geojson:
+            # fallback to any previously stored drawing
+            last_geojson = safe_session_get('last_drawn_raw')
+    except Exception:
+        last_geojson = safe_session_get('last_drawn_raw')
     if last_geojson:
         safe_session_set('last_drawn_raw', last_geojson)
         # Update bounds with current drawing
