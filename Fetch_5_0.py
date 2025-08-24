@@ -47,6 +47,39 @@ def safe_session_set(key, value):
     except Exception:
         pass
 
+# --- Persistence helpers to avoid storing large objects in session_state (Streamlit Cloud) ---
+import pickle
+import gzip
+import tempfile
+
+def persist_object_to_tempfile(obj) -> Optional[str]:
+    """Persist object to a gzipped pickle and return filepath, or None on failure."""
+    try:
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.pkl.gz')
+        tmp.close()
+        with gzip.open(tmp.name, 'wb') as fh:
+            pickle.dump(obj, fh, protocol=pickle.HIGHEST_PROTOCOL)
+        return tmp.name
+    except Exception:
+        try:
+            if 'tmp' in locals() and os.path.exists(tmp.name):
+                os.unlink(tmp.name)
+        except Exception:
+            pass
+        return None
+
+def load_persisted_object(path):
+    """Load an object previously persisted with persist_object_to_tempfile. Return None on failure."""
+    try:
+        if not path or not isinstance(path, str):
+            return None
+        if not os.path.exists(path):
+            return None
+        with gzip.open(path, 'rb') as fh:
+            return pickle.load(fh)
+    except Exception:
+        return None
+
 # -------------------------------------------------------------
 # Performance/Stability Helpers (added v5 PERF)
 # -------------------------------------------------------------
@@ -1060,10 +1093,13 @@ def make_map(in_df):       #bring in pandas dataframe
                 st.error(str(e))
             except Exception as e:
                 st.error(f"Hotspot clustering error: {e}")
+            # Persist large DataFrames to disk and store only file paths in session_state
+            clusters_path = persist_object_to_tempfile(clusters_df)
+            summary_path = persist_object_to_tempfile(summary_df)
             safe_session_set('hotspot_store', {
                 'params': param_key,
-                'clusters': clusters_df,
-                'summary': summary_df,
+                'clusters_path': clusters_path,
+                'summary_path': summary_path,
                 'radius_m': radius_m,
                 'min_samples': min_samples,
                 'time_col': time_col,
@@ -1073,8 +1109,8 @@ def make_map(in_df):       #bring in pandas dataframe
         else:
             store = safe_session_get('hotspot_store')
             if store and store.get('params') == param_key:
-                clusters_df = store.get('clusters', pandas.DataFrame())
-                summary_df = store.get('summary', pandas.DataFrame())
+                clusters_df = load_persisted_object(store.get('clusters_path')) or pandas.DataFrame()
+                summary_df = load_persisted_object(store.get('summary_path')) or pandas.DataFrame()
             elif store and store.get('params') != param_key and store.get('summary') is not None:
                 st.info("Parameters changed — press 'Run Hotspot Analysis' to recompute.")
 
@@ -1122,6 +1158,17 @@ def make_map(in_df):       #bring in pandas dataframe
                     file_name="Fetch_Hotspots_All.csv"
                 )
             if st.button("Clear Hotspots", type="secondary"):
+                # Remove any persisted files
+                store = safe_session_get('hotspot_store') or {}
+                try:
+                    cp = store.get('clusters_path')
+                    sp = store.get('summary_path')
+                    if cp and os.path.exists(cp):
+                        os.unlink(cp)
+                    if sp and os.path.exists(sp):
+                        os.unlink(sp)
+                except Exception:
+                    pass
                 safe_session_set('hotspot_store', None)
                 st.experimental_rerun()
             palette = ["red","blue","green","orange","purple","teal","pink","yellow","white","gray","cadetblue","darkred","darkblue","darkgreen"]
@@ -1947,11 +1994,13 @@ def make_map(in_df):       #bring in pandas dataframe
                             except Exception:
                                 pass
                         kepler_map = KeplerGl(height=600, data=data_payload, config=kepler_config)
-                        # Persist payload and config so we can rebuild KeplerGl later
+                        # Persist payload and config to disk to avoid storing large objects in session_state
                         try:
                             if isinstance(data_payload, dict) and isinstance(kepler_config, dict):
-                                safe_session_set('kepler_data_payload', data_payload)
-                                safe_session_set('kepler_config', kepler_config)
+                                payload_path = persist_object_to_tempfile(data_payload)
+                                config_path = persist_object_to_tempfile(kepler_config)
+                                safe_session_set('kepler_data_payload_path', payload_path)
+                                safe_session_set('kepler_config_path', config_path)
                             else:
                                 # Avoid storing malformed payloads (e.g., strings) into session
                                 st.warning("Kepler payload/config not persisted because structure is unexpected.")
@@ -1960,7 +2009,9 @@ def make_map(in_df):       #bring in pandas dataframe
                         # Optional debug output: show session payload type/summary
                         try:
                             if show_kepler_debug:
-                                preview = safe_session_get('kepler_data_payload', data_payload if 'data_payload' in locals() else None)
+                                # Prefer persisted payload path for preview if available
+                                kp_preview_path = safe_session_get('kepler_data_payload_path')
+                                preview = load_persisted_object(kp_preview_path) if kp_preview_path else (data_payload if 'data_payload' in locals() else None)
                                 st.write("Kepler payload type:", type(preview))
                                 if isinstance(preview, dict):
                                     st.write("Kepler payload keys:", list(preview.keys()))
@@ -2004,9 +2055,11 @@ def make_map(in_df):       #bring in pandas dataframe
                                     tmp_name = tmp.name
                                     tmp.close()
 
-                                    # Prefer persisted payload/config from session state
-                                    kp_payload = safe_session_get('kepler_data_payload') if safe_session_get('kepler_data_payload') is not None else (data_payload if 'data_payload' in locals() else None)
-                                    kp_config = safe_session_get('kepler_config') if safe_session_get('kepler_config') is not None else (kepler_config if 'kepler_config' in locals() else None)
+                                    # Prefer persisted payload/config from session state (paths)
+                                    kp_payload_path = safe_session_get('kepler_data_payload_path') if safe_session_get('kepler_data_payload_path') is not None else None
+                                    kp_config_path = safe_session_get('kepler_config_path') if safe_session_get('kepler_config_path') is not None else None
+                                    kp_payload = load_persisted_object(kp_payload_path) if kp_payload_path else (data_payload if 'data_payload' in locals() else None)
+                                    kp_config = load_persisted_object(kp_config_path) if kp_config_path else (kepler_config if 'kepler_config' in locals() else None)
 
                                     wrote_ok = False
                                     try:
