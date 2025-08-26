@@ -3273,7 +3273,7 @@ def time_filter(in_df, date_column_or_mapping):
         
     except Exception as e:
         st.error(f"❌ Error processing time filter: {str(e)}")
-        st.error("Please ensure the selected column contains valid date/time data.")
+        st.error("Please ensure the selected column contains valid date/time data. Remove any non-date addons such as UTC+3")
         return in_df
 
 def declutterer(in_df, date_column):
@@ -3366,7 +3366,7 @@ def declutterer(in_df, date_column):
         
     except Exception as e:
         st.error(f"❌ Error during decluttering: {str(e)}")
-        st.error("Please ensure the selected column contains valid date/time data.")
+        st.error("Please ensure the selected column contains valid date/time data.Remove any non-date addons such as UTC+3")
         return in_df
 
 def convert_kml_2_DF(kml_file):
@@ -3592,7 +3592,7 @@ def ingest_multiple_files():
             
             # Validate required columns
             if "LATITUDE" not in df.columns or "LONGITUDE" not in df.columns:
-                st.error(f"File {file.name} missing required latitude/longitude columns")
+                st.error(f"File {file.name} - first 15 rows were searched for latitude/longitude columns. None found. Data must include 'latitude' and 'longitude' columns.")
                 continue
                 
             df_list.append(df)
