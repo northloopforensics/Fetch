@@ -113,6 +113,49 @@ def filter_valid_coordinates(df: pandas.DataFrame, lat_col: str = 'LATITUDE', lo
     clean = working.dropna(subset=[lat_col, lon_col]).reset_index(drop=True)
     return clean, (original - len(clean))
 
+
+def detect_and_set_header_from_rows(df: pandas.DataFrame, max_search_rows: int = 15) -> pandas.DataFrame:
+    """Inspect the first `max_search_rows` rows of `df` to find a row that contains
+    both latitude and longitude column labels (case-insensitive). If found, promote
+    that row to be the DataFrame header and drop all rows above it. If not found,
+    ensure column names are strings so downstream .str operations won't fail.
+
+    Detection uses simple word-boundary regex for 'lat'/'latitude' and 'lon'/'longitude'.
+    """
+    if df is None or df.empty:
+        return df
+
+    # Make a defensive copy for inspection
+    working = df.copy().reset_index(drop=True)
+    nrows = min(len(working), max_search_rows)
+    lat_pattern = r"\blat\b|\blatitude\b"
+    lon_pattern = r"\blon\b|\blongitude\b"
+
+    header_row_idx = None
+    for i in range(nrows):
+        # convert row values to strings and lowercase for matching
+        row = working.iloc[i].astype(str).fillna("").str.lower()
+        has_lat = row.str.contains(lat_pattern, regex=True, na=False).any()
+        has_lon = row.str.contains(lon_pattern, regex=True, na=False).any()
+        if has_lat and has_lon:
+            header_row_idx = i
+            break
+
+    if header_row_idx is not None:
+        # Use that row as header
+        new_columns = working.iloc[header_row_idx].astype(str).str.strip().tolist()
+        new_df = working.iloc[header_row_idx + 1 :].copy().reset_index(drop=True)
+        # Ensure column names are unique strings
+        new_df.columns = [str(c) for c in new_columns]
+        return new_df
+
+    # If no header row found, convert existing column names to strings
+    try:
+        working.columns = [str(c) for c in working.columns]
+    except Exception:
+        pass
+    return working
+
 @st.cache_data(show_spinner=False)
 def cached_ip_lookup(ip: str):
     """Cache individual IP lookups to avoid repeated API calls during a session."""
@@ -1393,10 +1436,14 @@ def make_map(in_df):       #bring in pandas dataframe
                 if "POINT_COLOR" in valid_records.columns:
                     # First add the accuracy circles with lower z-index
                     if st.checkbox("Data has Accuracy or Radius Information"):
-                        # Filter to only show numeric columns for radius selection
+                        # Filter to show numeric columns for radius selection.
+                        # Use coercion to detect numeric-like columns (handles object dtypes with numeric strings).
                         numeric_columns = []
                         for col in gdf.columns:
-                            if gdf[col].dtype in ['int64', 'float64', 'int32', 'float32']:
+                            if col in ['LATITUDE', 'LONGITUDE']:
+                                continue
+                            coerced = pandas.to_numeric(gdf[col], errors='coerce')
+                            if coerced.notna().any():
                                 numeric_columns.append(col)
                         
                         if not numeric_columns:
@@ -1465,10 +1512,13 @@ def make_map(in_df):       #bring in pandas dataframe
                     color = gdf['POINT_COLOR'].iloc[0] if 'POINT_COLOR' in gdf.columns and len(gdf) > 0 else "#FF0000"
                     
                     if st.checkbox("Data has Accuracy or Radius Information"):
-                        # Filter to only show numeric columns for radius selection
+                        # Filter to show numeric columns for radius selection (coercion-based)
                         numeric_columns = []
                         for col in gdf.columns:
-                            if gdf[col].dtype in ['int64', 'float64', 'int32', 'float32']:
+                            if col in ['LATITUDE', 'LONGITUDE']:
+                                continue
+                            coerced = pandas.to_numeric(gdf[col], errors='coerce')
+                            if coerced.notna().any():
                                 numeric_columns.append(col)
                         
                         if not numeric_columns:
@@ -1548,8 +1598,14 @@ def make_map(in_df):       #bring in pandas dataframe
                         # Add radius circles controls directly in the settings
                         enable_radius_circles = st.checkbox("Create flat radius circles from point locations", value=False)
                         if enable_radius_circles:
-                            # Let user select radius column from dataframe
-                            numeric_cols = [c for c in gdf.columns if pandas.api.types.is_numeric_dtype(gdf[c]) and c not in ['LATITUDE', 'LONGITUDE']]
+                            # Let user select radius column from dataframe (coercion-based numeric detection)
+                            numeric_cols = []
+                            for c in gdf.columns:
+                                if c in ['LATITUDE', 'LONGITUDE']:
+                                    continue
+                                coerced = pandas.to_numeric(gdf[c], errors='coerce')
+                                if coerced.notna().any():
+                                    numeric_cols.append(c)
                             if numeric_cols:
                                 radius_col = st.selectbox("Select radius column (meters)", options=numeric_cols)
                             else:
@@ -3433,19 +3489,34 @@ def ingest_multiple_files():
             # Reset file pointer
             file.seek(0)
             filename_lower = file.name.lower()
-            # Excel files
+            # Excel files: read without inferring header so we can detect custom header rows
             if any(ext in file.name.lower() for ext in [".xls", ".xlsx"]):
-                df = pandas.read_excel(file)
+                try:
+                    df = pandas.read_excel(file, header=None)
+                    df = detect_and_set_header_from_rows(df, max_search_rows=15)
+                except Exception:
+                    # fallback to default read
+                    df = pandas.read_excel(file)
             
             # CSV/TXT files  
             elif any(ext in file.name.lower() for ext in [".csv", ".txt"]):
                 enc = selected_encoding if selected_encoding else "utf-8"
-                df = pandas.read_csv(file, encoding=enc)
+                # read without header so we can detect header row within first rows
+                try:
+                    df = pandas.read_csv(file, encoding=enc, header=None)
+                    df = detect_and_set_header_from_rows(df, max_search_rows=15)
+                except Exception:
+                    # fallback to standard read
+                    df = pandas.read_csv(file, encoding=enc)
             
             # TSV files
             elif ".tsv" in file.name.lower():
                 enc = selected_encoding if selected_encoding else "utf-8"
-                df = pandas.read_csv(file, encoding=enc, sep="\t")
+                try:
+                    df = pandas.read_csv(file, encoding=enc, sep="\t", header=None)
+                    df = detect_and_set_header_from_rows(df, max_search_rows=15)
+                except Exception:
+                    df = pandas.read_csv(file, encoding=enc, sep="\t")
             
             # GPX files
             elif ".gpx" in file.name.lower():
