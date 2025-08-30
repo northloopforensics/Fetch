@@ -545,11 +545,9 @@ def make_geofence_map():
     help_Box = st.expander(label="Help")
     with help_Box:
         st.markdown("""
-        Draw, name, save, import, and export geofences. Each geofence can have rules (dwell threshold coming soon).
-        - Use the draw toolbar on the map (polygon/rectangle). Circles can be added after saving via buffer.
-        - Click 'Capture Drawing' to load the last drawn shape into the metadata form.
-        - Export all as GeoJSON or import an existing GeoJSON.
-        - Convert hotspots to geofences from the hotspot panel (integration point pending).
+        Welcome to Fetch! This area is used to create geofences. To upload location data use the input area above.
+        - Use the draw toolbar on the map (polygon/rectangle). 
+        - Search for a street address or get the map of an IP address. See the IP address mapping tab to carry out bulk searches.
         """)
 
     # Search / locate
