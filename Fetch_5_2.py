@@ -2405,76 +2405,208 @@ def make_map(in_df):       #bring in pandas dataframe
 
         
     if map_Type == "Cell Sites":
-            towermastpoint = Map.add_circle_markers_from_xy(data=gdf, x="LONGITUDE", y="LATITUDE",color='white',fill_color='white', radius=1)
+            # Columns are already uppercased earlier in the pipeline — no need to repeat
+            Map.zoom_to_gdf(gdf)
 
-            gdf.columns = gdf.columns.str.upper()
-            gdf.geometry = gdf["GEOMETRY"]
-            Map.zoom_to_gdf(gdf) 
-            
             st.markdown("---")
 
-            # Only show color selector if there's no SOURCE_FILE column
-            if 'SOURCE_FILE' not in gdf.columns:
-                wedge_color = st.selectbox("Sector Color", options=['Red', 'Blue', 'Green', 'Purple', 'Orange', 'DarkRed', 'Beige', 'DarkBlue', 'DarkGreen', 'CadetBlue', 'Pink', 'LightBlue', 'LightGreen', 'Gray', 'Black', 'LightGray'])
+            # --- Sector color controls ---
+            sector_palette = ['Red', 'Blue', 'Green', 'Purple', 'Orange', 'DarkRed', 'Beige',
+                              'DarkBlue', 'DarkGreen', 'CadetBlue', 'Pink', 'LightBlue',
+                              'LightGreen', 'Gray', 'Black', 'LightGray']
 
-            # Get all column names for azimuth and beam width selection
-            all_columns = [col for col in valid_records.columns if col not in ['LATITUDE', 'LONGITUDE', 'SOURCE_FILE', 'POINT_COLOR', 'geometry']]
-            
+            color_mode = "single"  # default
+            if 'SOURCE_FILE' not in gdf.columns:
+                color_mode = st.radio(
+                    "Sector Coloring",
+                    options=["Single Color", "Cycle Per Sector"],
+                    horizontal=True,
+                    help="'Cycle Per Sector' auto-assigns a different color to each row so overlapping sectors are distinguishable."
+                )
+                color_mode = "cycle" if color_mode == "Cycle Per Sector" else "single"
+                if color_mode == "single":
+                    wedge_color = st.selectbox("Sector Color", options=sector_palette)
+
+            # Sector transparency slider
+            sector_opacity = st.slider("Sector Fill Opacity", min_value=0.0, max_value=1.0, value=0.5, step=0.05,
+                                       help="Lower values let you see through overlapping sectors.")
+
+            # --- Column selection helpers ---
+            all_columns = [col for col in valid_records.columns
+                           if col not in ['LATITUDE', 'LONGITUDE', 'SOURCE_FILE', 'POINT_COLOR', 'geometry']]
+
             if not all_columns:
                 st.error("No columns found for azimuth and beam width values. Please ensure your data contains the necessary columns.")
                 st.stop()
 
-            # Sector footprint size dropdown - ONLY the two preset options
-            radii = st.selectbox("Sector Footprint Size", options=["1 KM", "1.5 Mile"])
-            
+            # Auto-detect best-match column index for azimuth
+            azimuth_keywords = ['AZIMUTH', 'BEARING', 'DIRECTION', 'ANGLE', 'AZ']
+            azimuth_default = 0
+            for i, col in enumerate(all_columns):
+                if any(kw in col.upper() for kw in azimuth_keywords):
+                    azimuth_default = i
+                    break
+
+            # Auto-detect best-match column index for beam width
+            bw_keywords = ['BEAMWIDTH', 'BEAM_WIDTH', 'BW', 'SECTOR_ANGLE', 'BEAM']
+            bw_default = 0
+            for i, col in enumerate(all_columns):
+                if any(kw in col.upper() for kw in bw_keywords):
+                    bw_default = i
+                    break
+
+            # --- Sector footprint size: presets + "From Column" ---
+            # Detect numeric columns for the "From Column" option
+            numeric_radius_cols = []
+            for col in all_columns:
+                coerced = pandas.to_numeric(valid_records[col], errors='coerce')
+                if coerced.notna().any():
+                    numeric_radius_cols.append(col)
+
+            radius_options = ["1 KM", "1.5 Mile"]
+            if numeric_radius_cols:
+                radius_options.append("From Column")
+            radii = st.selectbox("Sector Footprint Size", options=radius_options)
+
             # Create the radius column based on selection
             if radii == "1.5 Mile":
                 valid_records = valid_records.copy()
                 valid_records["1.5 Mile"] = 2414
                 gdf["1.5 Mile"] = 2414
-                radii = "1.5 Mile"  # Use this column name for calculations
+                radii = "1.5 Mile"
             elif radii == "1 KM":
                 valid_records = valid_records.copy()
                 valid_records["1 KM"] = 1000
                 gdf["1 KM"] = 1000
-                radii = "1 KM"  # Use this column name for calculations
+                radii = "1 KM"
+            elif radii == "From Column":
+                # Auto-detect radius column
+                radius_kw = ['RADIUS', 'RANGE', 'DISTANCE', 'RADII']
+                radius_default = 0
+                for i, col in enumerate(numeric_radius_cols):
+                    if any(kw in col.upper() for kw in radius_kw):
+                        radius_default = i
+                        break
+                radii = st.selectbox("Radius Column (meters)", options=numeric_radius_cols, index=radius_default)
+                # Ensure numeric values in gdf
+                gdf[radii] = pandas.to_numeric(gdf[radii], errors='coerce').fillna(0)
 
-            # Azimuth and Beam Width dropdowns - show ALL available columns
-            Azimuth = st.selectbox("Sector Azimuth", options=all_columns)   
-            beam_width = st.selectbox("Sector Beam Width", options=all_columns, placeholder='None')
-            
+            # Azimuth and Beam Width dropdowns with auto-detected defaults
+            Azimuth = st.selectbox("Sector Azimuth", options=all_columns, index=azimuth_default)
+            beam_width = st.selectbox("Sector Beam Width", options=all_columns, index=bw_default,
+                                      placeholder='None')
+
+            # --- Build tower markers with popups (FeatureGroup for layer control) ---
+            tower_fg = folium.FeatureGroup(name="Tower Markers")
+            sector_fg = folium.FeatureGroup(name="Sector Wedges")
+
+            total_sectors = len(gdf)
+            use_progress = total_sectors > 200
+            if use_progress:
+                st.info(f"Rendering {total_sectors} sectors — this may take a moment.")
+                progress_bar = st.progress(0)
+
+            azimuth_warnings = 0
+
             try:
-                for index, row in gdf.iterrows():
+                for row_i, (index, row) in enumerate(gdf.iterrows()):
                     if radii in row:
-                        length = float(row[radii])/1000  # Convert to km
-                        half_beamwidth = float(row[beam_width]) / 2
-                        upside = (float(row[Azimuth]) + half_beamwidth) % 360
-                        downside = (float(row[Azimuth]) - half_beamwidth) % 360
-                        
-                        # Get color from POINT_COLOR if available, otherwise use selected wedge_color
-                        current_color = row["POINT_COLOR"] if "POINT_COLOR" in row else wedge_color
-                        
+                        radius_m = float(row[radii])
+                        if radius_m <= 0:
+                            continue
+                        length = radius_m / 1000  # Convert to km for get_point_at_distance
+
+                        # Beam width with NaN fallback (120° = standard 3-sector site)
+                        raw_bw = row[beam_width]
+                        if pandas.notna(raw_bw):
+                            try:
+                                bw_val = float(raw_bw)
+                            except (ValueError, TypeError):
+                                bw_val = 120.0
+                        else:
+                            bw_val = 120.0
+                        half_beamwidth = bw_val / 2
+
+                        # Azimuth with validation
+                        raw_az = row[Azimuth]
+                        try:
+                            az_val = float(raw_az) % 360
+                        except (ValueError, TypeError):
+                            azimuth_warnings += 1
+                            continue
+                        if float(raw_az) < 0 or float(raw_az) > 360:
+                            azimuth_warnings += 1
+
+                        upside = (az_val + half_beamwidth) % 360
+                        downside = (az_val - half_beamwidth) % 360
+
+                        # Determine sector color
+                        if "POINT_COLOR" in row and pandas.notna(row.get("POINT_COLOR")):
+                            current_color = row["POINT_COLOR"]
+                        elif color_mode == "cycle":
+                            current_color = sector_palette[row_i % len(sector_palette)]
+                        else:
+                            current_color = wedge_color
+
                         up_lat, up_lon = get_point_at_distance(row["LATITUDE"], row["LONGITUDE"], d=length, bearing=upside)
                         dwn_lat, dwn_lon = get_point_at_distance(row["LATITUDE"], row["LONGITUDE"], d=length, bearing=downside)
-                        
-                        leafmap.folium.PolyLine([[row["LATITUDE"],row["LONGITUDE"]], [up_lat,up_lon]], color=current_color).add_to(Map)
-                        leafmap.folium.PolyLine([[row["LATITUDE"],row["LONGITUDE"]], [dwn_lat,dwn_lon]], color=current_color).add_to(Map)
-                        
+
+                        leafmap.folium.PolyLine(
+                            [[row["LATITUDE"], row["LONGITUDE"]], [up_lat, up_lon]],
+                            color=current_color
+                        ).add_to(sector_fg)
+                        leafmap.folium.PolyLine(
+                            [[row["LATITUDE"], row["LONGITUDE"]], [dwn_lat, dwn_lon]],
+                            color=current_color
+                        ).add_to(sector_fg)
+
+                        # Build popup content (exclude internal/geometry columns)
+                        popup_items = [f'{k}: {v}' for k, v in row.items()
+                                       if k not in ('geometry', 'POINT_COLOR', 'SOURCE_FILE')]
+                        popup_html = '<br>'.join(popup_items)
+
                         plugins.SemiCircle(
-                            (row["LATITUDE"],row["LONGITUDE"]),
-                            radius=float(row[radii])/2,
-                            direction=float(row[Azimuth]),
-                            arc=float(row[beam_width]),
+                            (row["LATITUDE"], row["LONGITUDE"]),
+                            radius=float(row[radii]) / 2,
+                            direction=az_val,
+                            arc=bw_val,
                             color=current_color,
                             fill_color=current_color,
                             opacity=1,
-                            fill_opacity=.5,
-                            popup=('<br>'.join(f'{k}: {v}' for k, v in row.items()))
-                        ).add_to(Map)
-                        
+                            fill_opacity=sector_opacity,
+                            popup=popup_html
+                        ).add_to(sector_fg)
+
+                        # Tower marker with popup (icon + larger radius for visibility)
+                        folium.CircleMarker(
+                            location=[row["LATITUDE"], row["LONGITUDE"]],
+                            radius=5,
+                            color='black',
+                            fill=True,
+                            fill_color='white',
+                            fill_opacity=1.0,
+                            weight=2,
+                            popup=folium.Popup(popup_html, max_width=350),
+                            tooltip=f"Tower ({row['LATITUDE']:.5f}, {row['LONGITUDE']:.5f})"
+                        ).add_to(tower_fg)
+
+                    if use_progress:
+                        progress_bar.progress((row_i + 1) / total_sectors)
+
+                if use_progress:
+                    progress_bar.empty()
+
             except (TypeError, ValueError) as e:
                 st.info("Assign columns for Sector Footprint Size (Radius from Station in Meters), Tower Direction/Azimuth (Degrees), & Beam Width (Degrees)")
                 st.error(f"Error: {str(e)}")
+
+            if azimuth_warnings > 0:
+                st.warning(f"⚠️ {azimuth_warnings} sector(s) had azimuth values outside 0–360° (corrected via modulo) or non-numeric values (skipped).")
+
+            # Add feature groups and layer control
+            sector_fg.add_to(Map)
+            tower_fg.add_to(Map)
+            folium.LayerControl(collapsed=False).add_to(Map)
 
     # Add the legend if we have multiple data sources
     if 'SOURCE_FILE' in valid_records.columns and 'POINT_COLOR' in valid_records.columns:
