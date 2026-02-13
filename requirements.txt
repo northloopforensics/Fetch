@@ -15,4 +15,6 @@ numpy<2
 python-dateutil
 pytz
 scikit-learn
+openpyxl
 keplergl
+plotly
