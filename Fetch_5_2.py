@@ -299,6 +299,487 @@ def compute_hotspots(df: pandas.DataFrame, radius_m: float, min_samples: int, ti
 def cached_compute_hotspots(df: pandas.DataFrame, radius_m: float, min_samples: int, time_col: Optional[str], trim_chaining: bool = True):
     return compute_hotspots(df, radius_m, min_samples, time_col, trim_chaining=trim_chaining)
 
+# -------------------------------------------------------------
+# Coordinate Format Conversion Helpers (Feature #6)
+# -------------------------------------------------------------
+# Patterns for DMS (Degrees, Minutes, Seconds) coordinates
+# Examples: 40°44'54"N, 40° 44' 54" N, 40-44-54N, 40d44m54sN
+DMS_PATTERN = re.compile(
+    r'^\s*(?P<deg>-?\d{1,3})\s*[\xb0dD\-]\s*'
+    r'(?P<min>\d{1,2})\s*[\'\u2018\u2019mM\-]\s*'
+    r'(?P<sec>\d{1,2}(?:\.\d+)?)\s*["\u201c\u201dsS]?\s*'
+    r'(?P<dir>[NSEWnsew])?\s*$',
+    re.VERBOSE
+)
+# Pattern for DD MM.MMM (Degrees Decimal Minutes)
+DDM_PATTERN = re.compile(
+    r'^\s*(?P<deg>-?\d{1,3})\s*[\xb0dD\-]\s*'
+    r'(?P<min>\d{1,2}(?:\.\d+)?)\s*[\'\u2018\u2019mM]?\s*'
+    r'(?P<dir>[NSEWnsew])?\s*$',
+    re.VERBOSE
+)
+
+def dms_to_decimal(deg: float, minutes: float, seconds: float, direction: str = '') -> float:
+    """Convert DMS (Degrees, Minutes, Seconds) to decimal degrees."""
+    decimal = abs(deg) + minutes / 60.0 + seconds / 3600.0
+    if direction.upper() in ('S', 'W') or deg < 0:
+        decimal = -decimal
+    return decimal
+
+def ddm_to_decimal(deg: float, minutes: float, direction: str = '') -> float:
+    """Convert DDM (Degrees Decimal Minutes) to decimal degrees."""
+    decimal = abs(deg) + minutes / 60.0
+    if direction.upper() in ('S', 'W') or deg < 0:
+        decimal = -decimal
+    return decimal
+
+def parse_coordinate_value(value) -> Optional[float]:
+    """Try to parse a coordinate value from various formats.
+    Supports: decimal degrees, DMS, DDM.
+    Returns float (decimal degrees) or None if unparseable.
+    """
+    if value is None:
+        return None
+    # Already numeric
+    if isinstance(value, (int, float)):
+        if np.isfinite(value):
+            return float(value)
+        return None
+    s = str(value).strip()
+    if not s:
+        return None
+    # Try plain float first
+    try:
+        v = float(s)
+        if np.isfinite(v):
+            return v
+        return None
+    except ValueError:
+        pass
+    # Try DMS
+    m = DMS_PATTERN.match(s)
+    if m:
+        return dms_to_decimal(
+            float(m.group('deg')),
+            float(m.group('min')),
+            float(m.group('sec')),
+            m.group('dir') or ''
+        )
+    # Try DDM
+    m = DDM_PATTERN.match(s)
+    if m:
+        return ddm_to_decimal(
+            float(m.group('deg')),
+            float(m.group('min')),
+            m.group('dir') or ''
+        )
+    return None
+
+def convert_coordinate_column(series: pandas.Series) -> pandas.Series:
+    """Convert a column of coordinates from any supported format to decimal degrees.
+    Handles: decimal degrees, DMS, DDM. Non-convertible values become NaN.
+    """
+    return series.apply(parse_coordinate_value).astype(float)
+
+def detect_coordinate_format(series: pandas.Series) -> str:
+    """Detect the coordinate format of a pandas Series.
+    Returns one of: 'decimal', 'dms', 'ddm', 'mixed', 'unknown'
+    """
+    sample = series.dropna().head(20)
+    formats_found = set()
+    for val in sample:
+        s = str(val).strip()
+        try:
+            float(s)
+            formats_found.add('decimal')
+            continue
+        except ValueError:
+            pass
+        if DMS_PATTERN.match(s):
+            formats_found.add('dms')
+        elif DDM_PATTERN.match(s):
+            formats_found.add('ddm')
+        else:
+            formats_found.add('unknown')
+    if len(formats_found) == 1:
+        return formats_found.pop()
+    elif len(formats_found) > 1 and 'unknown' not in formats_found:
+        return 'mixed'
+    elif 'unknown' in formats_found and len(formats_found) > 1:
+        return 'mixed'
+    return 'unknown'
+
+# UTM conversion (basic zones 1-60, WGS84)
+def utm_to_latlon(easting: float, northing: float, zone_number: int, zone_letter: str = 'N') -> tuple:
+    """Convert UTM coordinates to latitude/longitude (WGS84).
+    Simple implementation without external UTM library dependency.
+    """
+    # WGS84 parameters
+    a = 6378137.0
+    f = 1 / 298.257223563
+    e = (2 * f - f ** 2) ** 0.5
+    e_prime_sq = e ** 2 / (1 - e ** 2)
+
+    # Determine hemisphere
+    northern = zone_letter.upper() >= 'N'
+
+    x = easting - 500000.0
+    y = northing
+    if not northern:
+        y = y - 10000000.0
+
+    lon0 = radians((zone_number - 1) * 6 - 180 + 3)
+
+    M = y / 0.9996
+    mu = M / (a * (1 - e**2/4 - 3*e**4/64 - 5*e**6/256))
+
+    e1 = (1 - (1 - e**2)**0.5) / (1 + (1 - e**2)**0.5)
+    phi1 = mu + (3*e1/2 - 27*e1**3/32) * sin(2*mu)
+    phi1 += (21*e1**2/16 - 55*e1**4/32) * sin(4*mu)
+    phi1 += (151*e1**3/96) * sin(6*mu)
+    phi1 += (1097*e1**4/512) * sin(8*mu)
+
+    N1 = a / (1 - e**2 * sin(phi1)**2)**0.5
+    T1 = (sin(phi1) / cos(phi1))**2
+    C1 = e_prime_sq * cos(phi1)**2
+    R1 = a * (1 - e**2) / (1 - e**2 * sin(phi1)**2)**1.5
+    D = x / (N1 * 0.9996)
+
+    lat = phi1 - (N1 * (sin(phi1) / cos(phi1)) / R1) * (
+        D**2/2 - (5 + 3*T1 + 10*C1 - 4*C1**2 - 9*e_prime_sq) * D**4/24
+        + (61 + 90*T1 + 298*C1 + 45*T1**2 - 252*e_prime_sq - 3*C1**2) * D**6/720
+    )
+    lon = lon0 + (D - (1 + 2*T1 + C1) * D**3/6
+                  + (5 - 2*C1 + 28*T1 - 3*C1**2 + 8*e_prime_sq + 24*T1**2) * D**5/120) / cos(phi1)
+
+    return (degrees(lat), degrees(lon))
+
+UTM_PATTERN = re.compile(
+    r'^\s*(?P<zone>\d{1,2})\s*(?P<letter>[A-Za-z])\s+'
+    r'(?P<easting>\d+(?:\.\d+)?)\s*[mM]?\s*[Ee]?\s+'
+    r'(?P<northing>\d+(?:\.\d+)?)\s*[mM]?\s*[Nn]?\s*$'
+)
+
+def parse_utm_string(s: str) -> Optional[tuple]:
+    """Parse a UTM string like '17T 630000 4833000' into (lat, lon) or None."""
+    m = UTM_PATTERN.match(str(s).strip())
+    if not m:
+        return None
+    try:
+        zone = int(m.group('zone'))
+        letter = m.group('letter')
+        easting = float(m.group('easting'))
+        northing = float(m.group('northing'))
+        if 1 <= zone <= 60:
+            return utm_to_latlon(easting, northing, zone, letter)
+    except Exception:
+        pass
+    return None
+
+# -------------------------------------------------------------
+# Co-Location / Proximity Analysis (Feature #3)
+# -------------------------------------------------------------
+def haversine_distance_m(lat1, lon1, lat2, lon2):
+    """Calculate haversine distance in meters between two points."""
+    R = 6371000.0
+    phi1, phi2 = radians(lat1), radians(lat2)
+    dphi = radians(lat2 - lat1)
+    dlam = radians(lon2 - lon1)
+    a = sin(dphi/2)**2 + cos(phi1)*cos(phi2)*sin(dlam/2)**2
+    return 2 * R * atan2(a**0.5, (1-a)**0.5)
+
+def compute_colocation(df: pandas.DataFrame, time_col: str,
+                       radius_m: float = 50.0, time_window_min: float = 10.0) -> pandas.DataFrame:
+    """Detect co-location events between different source files.
+
+    For each pair of source files, find records where two subjects were within
+    `radius_m` meters of each other within `time_window_min` minutes.
+
+    Returns a DataFrame of co-location events with columns:
+    SOURCE_A, SOURCE_B, TIME_A, TIME_B, LAT_A, LON_A, LAT_B, LON_B,
+    DISTANCE_M, TIME_DIFF_MIN, MIDPOINT_LAT, MIDPOINT_LON
+    """
+    if 'SOURCE_FILE' not in df.columns:
+        return pandas.DataFrame()
+
+    sources = df['SOURCE_FILE'].unique()
+    if len(sources) < 2:
+        return pandas.DataFrame()
+
+    # Pre-parse datetimes
+    working = df.copy()
+    working['_PARSED_DT'] = pandas.to_datetime(working[time_col], errors='coerce')
+    working = working.dropna(subset=['_PARSED_DT', 'LATITUDE', 'LONGITUDE'])
+    working['LATITUDE'] = pandas.to_numeric(working['LATITUDE'], errors='coerce')
+    working['LONGITUDE'] = pandas.to_numeric(working['LONGITUDE'], errors='coerce')
+    working = working.dropna(subset=['LATITUDE', 'LONGITUDE'])
+    working = working.sort_values('_PARSED_DT').reset_index(drop=True)
+
+    time_delta = pandas.Timedelta(minutes=time_window_min)
+    events = []
+
+    source_list = sorted(sources)
+    for i in range(len(source_list)):
+        for j in range(i+1, len(source_list)):
+            src_a = source_list[i]
+            src_b = source_list[j]
+            df_a = working[working['SOURCE_FILE'] == src_a].reset_index(drop=True)
+            df_b = working[working['SOURCE_FILE'] == src_b].reset_index(drop=True)
+
+            if df_a.empty or df_b.empty:
+                continue
+
+            # For each point in A, find points in B within the time window
+            # Use vectorized pre-filtering by time, then check distance
+            for _, row_a in df_a.iterrows():
+                t_a = row_a['_PARSED_DT']
+                lat_a, lon_a = row_a['LATITUDE'], row_a['LONGITUDE']
+
+                time_mask = (df_b['_PARSED_DT'] >= t_a - time_delta) & (df_b['_PARSED_DT'] <= t_a + time_delta)
+                candidates = df_b[time_mask]
+
+                for _, row_b in candidates.iterrows():
+                    lat_b, lon_b = row_b['LATITUDE'], row_b['LONGITUDE']
+                    dist = haversine_distance_m(lat_a, lon_a, lat_b, lon_b)
+                    if dist <= radius_m:
+                        events.append({
+                            'SOURCE_A': src_a,
+                            'SOURCE_B': src_b,
+                            'TIME_A': t_a,
+                            'TIME_B': row_b['_PARSED_DT'],
+                            'LAT_A': lat_a,
+                            'LON_A': lon_a,
+                            'LAT_B': lat_b,
+                            'LON_B': lon_b,
+                            'DISTANCE_M': round(dist, 2),
+                            'TIME_DIFF_MIN': round(abs((t_a - row_b['_PARSED_DT']).total_seconds()) / 60, 2),
+                            'MIDPOINT_LAT': (lat_a + lat_b) / 2,
+                            'MIDPOINT_LON': (lon_a + lon_b) / 2,
+                        })
+
+    result = pandas.DataFrame(events)
+    if not result.empty:
+        result = result.sort_values('TIME_A').reset_index(drop=True)
+    return result
+
+@st.cache_data(show_spinner=False)
+def cached_compute_colocation(df: pandas.DataFrame, time_col: str, radius_m: float, time_window_min: float):
+    return compute_colocation(df, time_col, radius_m, time_window_min)
+
+# -------------------------------------------------------------
+# Stop / Dwell Detection (Feature #7)
+# -------------------------------------------------------------
+def compute_stops(df: pandas.DataFrame, time_col: str, radius_m: float = 50.0,
+                  min_duration_min: float = 5.0, source_file: Optional[str] = None) -> pandas.DataFrame:
+    """Detect stationary periods (stops/dwells) in location data.
+
+    Groups consecutive points that stay within `radius_m` of their running centroid
+    for at least `min_duration_min` minutes.
+
+    Returns a DataFrame with columns:
+    STOP_ID, CENTER_LAT, CENTER_LON, ARRIVAL, DEPARTURE, DURATION_MIN, POINT_COUNT, SOURCE_FILE
+    """
+    working = df.copy()
+    working['_PARSED_DT'] = pandas.to_datetime(working[time_col], errors='coerce')
+    working['LATITUDE'] = pandas.to_numeric(working['LATITUDE'], errors='coerce')
+    working['LONGITUDE'] = pandas.to_numeric(working['LONGITUDE'], errors='coerce')
+    working = working.dropna(subset=['_PARSED_DT', 'LATITUDE', 'LONGITUDE'])
+    working = working.sort_values('_PARSED_DT').reset_index(drop=True)
+
+    if working.empty:
+        return pandas.DataFrame(columns=['STOP_ID','CENTER_LAT','CENTER_LON','ARRIVAL','DEPARTURE','DURATION_MIN','POINT_COUNT','SOURCE_FILE'])
+
+    stops = []
+    stop_id = 0
+    i = 0
+    n = len(working)
+
+    while i < n:
+        # Start a candidate stop
+        cluster_lats = [working.at[i, 'LATITUDE']]
+        cluster_lons = [working.at[i, 'LONGITUDE']]
+        cluster_start = working.at[i, '_PARSED_DT']
+        cluster_end = cluster_start
+        j = i + 1
+
+        while j < n:
+            lat_j = working.at[j, 'LATITUDE']
+            lon_j = working.at[j, 'LONGITUDE']
+            centroid_lat = np.mean(cluster_lats)
+            centroid_lon = np.mean(cluster_lons)
+            dist = haversine_distance_m(centroid_lat, centroid_lon, lat_j, lon_j)
+
+            if dist <= radius_m:
+                cluster_lats.append(lat_j)
+                cluster_lons.append(lon_j)
+                cluster_end = working.at[j, '_PARSED_DT']
+                j += 1
+            else:
+                break
+
+        duration = (cluster_end - cluster_start).total_seconds() / 60.0
+        point_count = j - i
+
+        if duration >= min_duration_min and point_count >= 2:
+            stops.append({
+                'STOP_ID': stop_id,
+                'CENTER_LAT': round(np.mean(cluster_lats), 6),
+                'CENTER_LON': round(np.mean(cluster_lons), 6),
+                'ARRIVAL': cluster_start,
+                'DEPARTURE': cluster_end,
+                'DURATION_MIN': round(duration, 2),
+                'POINT_COUNT': point_count,
+                'SOURCE_FILE': source_file or (working.at[i, 'SOURCE_FILE'] if 'SOURCE_FILE' in working.columns else '')
+            })
+            stop_id += 1
+
+        i = j if j > i else i + 1
+
+    return pandas.DataFrame(stops)
+
+@st.cache_data(show_spinner=False)
+def cached_compute_stops(df: pandas.DataFrame, time_col: str, radius_m: float,
+                         min_duration_min: float, source_file: Optional[str] = None):
+    return compute_stops(df, time_col, radius_m, min_duration_min, source_file)
+
+# -------------------------------------------------------------
+# EXIF Photo Location Import (Feature #13)
+# -------------------------------------------------------------
+def extract_exif_gps(file_bytes: bytes, filename: str = '') -> Optional[dict]:
+    """Extract GPS coordinates and metadata from a JPEG/TIFF image's EXIF data.
+    Returns dict with LATITUDE, LONGITUDE, DATETIME, FILENAME or None.
+    """
+    try:
+        from PIL import Image
+        from PIL.ExifTags import TAGS, GPSTAGS
+        import io
+
+        img = Image.open(io.BytesIO(file_bytes))
+        exif_data = img._getexif()
+        if not exif_data:
+            return None
+
+        gps_info = {}
+        datetime_original = None
+
+        for tag_id, value in exif_data.items():
+            tag_name = TAGS.get(tag_id, tag_id)
+            if tag_name == 'GPSInfo':
+                for gps_tag_id, gps_value in value.items():
+                    gps_tag_name = GPSTAGS.get(gps_tag_id, gps_tag_id)
+                    gps_info[gps_tag_name] = gps_value
+            elif tag_name == 'DateTimeOriginal':
+                datetime_original = value
+            elif tag_name == 'DateTime' and datetime_original is None:
+                datetime_original = value
+
+        if not gps_info:
+            return None
+
+        # Extract latitude
+        lat_data = gps_info.get('GPSLatitude')
+        lat_ref = gps_info.get('GPSLatitudeRef', 'N')
+        lon_data = gps_info.get('GPSLongitude')
+        lon_ref = gps_info.get('GPSLongitudeRef', 'E')
+
+        if not lat_data or not lon_data:
+            return None
+
+        def gps_to_decimal(gps_coords, ref):
+            """Convert GPS EXIF format to decimal degrees."""
+            try:
+                d = float(gps_coords[0])
+                m = float(gps_coords[1])
+                s = float(gps_coords[2])
+                decimal = d + m/60.0 + s/3600.0
+                if ref in ('S', 'W'):
+                    decimal = -decimal
+                return decimal
+            except (TypeError, IndexError, ValueError):
+                return None
+
+        lat = gps_to_decimal(lat_data, lat_ref)
+        lon = gps_to_decimal(lon_data, lon_ref)
+
+        if lat is None or lon is None:
+            return None
+
+        result = {
+            'LATITUDE': lat,
+            'LONGITUDE': lon,
+            'FILENAME': filename,
+        }
+
+        # Parse datetime if available
+        if datetime_original:
+            try:
+                # EXIF datetime format: "2024:01:15 14:30:00"
+                dt = datetime.datetime.strptime(datetime_original, '%Y:%m:%d %H:%M:%S')
+                result['DATETIME'] = dt
+            except (ValueError, TypeError):
+                result['DATETIME'] = None
+        else:
+            result['DATETIME'] = None
+
+        # Extract altitude if available
+        alt = gps_info.get('GPSAltitude')
+        alt_ref = gps_info.get('GPSAltitudeRef', 0)
+        if alt is not None:
+            try:
+                altitude = float(alt)
+                if alt_ref == 1:  # below sea level
+                    altitude = -altitude
+                result['ELEVATION'] = altitude
+            except (TypeError, ValueError):
+                pass
+
+        # Extract bearing/direction if available
+        img_dir = gps_info.get('GPSImgDirection')
+        if img_dir is not None:
+            try:
+                result['BEARING'] = float(img_dir)
+            except (TypeError, ValueError):
+                pass
+
+        return result
+
+    except ImportError:
+        return None
+    except Exception:
+        return None
+
+def ingest_photos(uploaded_photos) -> Optional[pandas.DataFrame]:
+    """Process uploaded photo files and extract GPS data.
+    Returns DataFrame with LATITUDE, LONGITUDE, DATETIME, FILENAME, etc.
+    """
+    if not uploaded_photos:
+        return None
+
+    records = []
+    errors = []
+    for photo in uploaded_photos:
+        try:
+            photo.seek(0)
+            photo_bytes = photo.read()
+            result = extract_exif_gps(photo_bytes, photo.name)
+            if result:
+                records.append(result)
+            else:
+                errors.append(photo.name)
+        except Exception as e:
+            errors.append(f"{photo.name}: {str(e)}")
+
+    if errors:
+        st.warning(f"No GPS data found in {len(errors)} photo(s): {', '.join(errors[:5])}" +
+                   (f"... and {len(errors)-5} more" if len(errors) > 5 else ""))
+
+    if not records:
+        return None
+
+    df = pandas.DataFrame(records)
+    return df
+
+
 def render_tactical_clock(points_df: pandas.DataFrame, time_col: str, title: str = "Tactical Clock", height: int = 520,
                           center_lat: Optional[float] = None, center_lon: Optional[float] = None, radius_m: Optional[float] = None,
                           visits: Optional[int] = None, max_distance_m: Optional[float] = None,
@@ -3497,7 +3978,39 @@ def ingest_multiple_files():
     uploaded_files = st.file_uploader("Choose files to analyze", 
                                     type=["csv", "txt", "tsv", "xlsx", "xls", "gpx", "kmz", "kml"],
                                     accept_multiple_files=True)
+
+    # --- EXIF Photo Location Import (Feature #13) ---
+    with st.expander("Import Photo Locations (EXIF GPS)", expanded=False):
+        st.caption("Upload JPEG/TIFF photos to extract GPS coordinates from EXIF metadata.")
+        uploaded_photos = st.file_uploader(
+            "Choose photos",
+            type=["jpg", "jpeg", "tiff", "tif"],
+            accept_multiple_files=True,
+            key="photo_uploader"
+        )
+        if uploaded_photos:
+            try:
+                photo_df = ingest_photos(uploaded_photos)
+                if photo_df is not None and not photo_df.empty:
+                    st.success(f"Extracted GPS data from {len(photo_df)} photo(s)")
+                    st.dataframe(photo_df.head(10), use_container_width=True)
+                    photo_color = st.color_picker("Photo point color", value="#00FF00", key="photo_color_picker")
+                    photo_df['SOURCE_FILE'] = 'EXIF_Photos'
+                    photo_df['POINT_COLOR'] = photo_color
+                    photo_df.columns = photo_df.columns.str.upper()
+                    safe_session_set('exif_photo_df', photo_df)
+                else:
+                    st.warning("No GPS data could be extracted from the uploaded photos.")
+                    safe_session_set('exif_photo_df', None)
+            except Exception as e:
+                st.error(f"Error processing photos: {str(e)}")
+                safe_session_set('exif_photo_df', None)
+
     if not uploaded_files:
+        # Still return photo data if available
+        exif_df = safe_session_get('exif_photo_df')
+        if exif_df is not None and not exif_df.empty:
+            return exif_df.copy()
         return None
 
     # Set how many columns per row
@@ -3630,7 +4143,21 @@ def ingest_multiple_files():
             if "LATITUDE" not in df.columns or "LONGITUDE" not in df.columns:
                 st.error(f"File {file.name} - first 15 rows were searched for latitude/longitude columns. None found. Data must include 'latitude' and 'longitude' columns.")
                 continue
-                
+
+            # --- Coordinate Format Conversion (Feature #6) ---
+            # Detect and convert non-decimal coordinate formats (DMS, DDM, UTM)
+            for coord_col in ['LATITUDE', 'LONGITUDE']:
+                if coord_col in df.columns:
+                    fmt = detect_coordinate_format(df[coord_col])
+                    if fmt in ('dms', 'ddm', 'mixed'):
+                        st.info(f"📐 {file.name}: Detected **{fmt.upper()}** format in {coord_col} — converting to decimal degrees.")
+                        df[coord_col] = convert_coordinate_column(df[coord_col])
+                    elif fmt == 'decimal':
+                        df[coord_col] = pandas.to_numeric(df[coord_col], errors='coerce')
+                    else:
+                        # Try converting anyway in case of mixed numeric/text
+                        df[coord_col] = convert_coordinate_column(df[coord_col])
+
             df_list.append(df)
 
         except Exception as e:
@@ -3645,7 +4172,17 @@ def ingest_multiple_files():
             # Ensure unique columns and reset index one final time
             combined_df = combined_df.loc[:, ~combined_df.columns.duplicated()]
             combined_df = combined_df.reset_index(drop=True)
-            
+
+            # Merge EXIF photo data if available
+            exif_df = safe_session_get('exif_photo_df')
+            if exif_df is not None and not exif_df.empty:
+                exif_copy = exif_df.copy()
+                exif_copy.columns = exif_copy.columns.str.upper()
+                combined_df = pandas.concat([combined_df, exif_copy], ignore_index=True, sort=False)
+                combined_df = combined_df.loc[:, ~combined_df.columns.duplicated()]
+                combined_df = combined_df.reset_index(drop=True)
+                st.info(f"📷 Merged {len(exif_df)} photo location(s) into dataset.")
+
             return combined_df
         except Exception as e:
             st.error(f"Error combining data: {str(e)}")
@@ -4058,7 +4595,7 @@ if preview_data is not None:
     if declutter_active or timefilter_active:
         st.markdown(":orange[Filters are active]")
         
-    tab1, tab2, tab3 = st.tabs(["Preview/KML Map", "Analysis Maps", "Create Geofence"])    
+    tab1, tab2, tab3, tab4 = st.tabs(["Preview/KML Map", "Analysis Maps", "Create Geofence", "Advanced Analysis"])    
     with tab1:
         try:
             # Clean preview_data before passing to st.map to avoid null value errors
@@ -4130,6 +4667,277 @@ if preview_data is not None:
             st.error("Check that your data has Latitude and Longitude columns")
     with tab3:
         make_geofence_map()
+    with tab4:
+        st.header("Advanced Analysis")
+        adv_tab1, adv_tab2, adv_tab3 = st.tabs(["Stop/Dwell Detection", "Co-Location Analysis", "Coordinate Tools"])
+
+        with adv_tab1:
+            # --- Stop / Dwell Detection (Feature #7) ---
+            st.subheader("Stop / Dwell Detection")
+            st.caption("Detect locations where a subject remained stationary for a configurable duration.")
+
+            # Time column detection
+            stop_time_cols = [c for c in preview_data.columns if 'TIME' in c.upper() or 'DATE' in c.upper()]
+            if not stop_time_cols:
+                st.warning("No date/time columns detected. Stop/Dwell detection requires time data.")
+            else:
+                stop_col1, stop_col2, stop_col3 = st.columns(3)
+                with stop_col1:
+                    stop_time_col = st.selectbox("Time Column", options=stop_time_cols, key="stop_time_col")
+                with stop_col2:
+                    stop_radius = st.number_input("Radius (m)", min_value=5, max_value=2000, value=50, step=5, key="stop_radius",
+                                                  help="Maximum distance from centroid to be considered the same stop")
+                with stop_col3:
+                    stop_min_duration = st.number_input("Min Duration (min)", min_value=1, max_value=1440, value=5, step=1, key="stop_min_dur",
+                                                        help="Minimum time at a location to qualify as a stop")
+
+                # Per-source or combined
+                run_stops_per_source = False
+                if 'SOURCE_FILE' in preview_data.columns and preview_data['SOURCE_FILE'].nunique() > 1:
+                    run_stops_per_source = st.checkbox("Analyze each source file separately", value=True, key="stop_per_src")
+
+                if st.button("Detect Stops", key="run_stops"):
+                    with st.spinner("Analyzing stops..."):
+                        all_stops = []
+                        if run_stops_per_source:
+                            for src in preview_data['SOURCE_FILE'].unique():
+                                src_df = preview_data[preview_data['SOURCE_FILE'] == src]
+                                stops_df = cached_compute_stops(src_df, stop_time_col, stop_radius, stop_min_duration, src)
+                                if not stops_df.empty:
+                                    all_stops.append(stops_df)
+                            if all_stops:
+                                stops_result = pandas.concat(all_stops, ignore_index=True)
+                            else:
+                                stops_result = pandas.DataFrame()
+                        else:
+                            stops_result = cached_compute_stops(preview_data, stop_time_col, stop_radius, stop_min_duration)
+
+                        if stops_result.empty:
+                            st.warning("No stops detected with current parameters. Try increasing the radius or decreasing the minimum duration.")
+                        else:
+                            safe_session_set('stop_results', stops_result)
+
+                # Display results
+                stops_result = safe_session_get('stop_results')
+                if stops_result is not None and isinstance(stops_result, pandas.DataFrame) and not stops_result.empty:
+                    st.markdown(f"### Found {len(stops_result)} Stop(s)")
+
+                    col_m1, col_m2, col_m3 = st.columns(3)
+                    with col_m1:
+                        st.metric("Total Stops", len(stops_result))
+                    with col_m2:
+                        avg_dur = stops_result['DURATION_MIN'].mean()
+                        st.metric("Avg Duration", f"{avg_dur:.1f} min")
+                    with col_m3:
+                        total_dwell = stops_result['DURATION_MIN'].sum()
+                        if total_dwell > 60:
+                            st.metric("Total Dwell Time", f"{total_dwell/60:.1f} hrs")
+                        else:
+                            st.metric("Total Dwell Time", f"{total_dwell:.1f} min")
+
+                    st.dataframe(stops_result, use_container_width=True)
+                    st.download_button("Download Stops CSV", data=stops_result.to_csv(index=False),
+                                       file_name="Fetch_Stops.csv", key="dl_stops")
+
+                    # Map the stops
+                    st.markdown("### Stop Locations Map")
+                    stop_map = leafmap.Map()
+                    stop_map.add_basemap(basemap='ROADMAP')
+                    stop_map.add_basemap(basemap='TERRAIN')
+                    stop_map.add_basemap(basemap='HYBRID')
+                    stop_map.add_basemap(basemap='CartoDB.DarkMatter')
+
+                    stop_palette = ["red","blue","green","orange","purple","teal","pink","yellow"]
+                    for idx, row in stops_result.iterrows():
+                        color = stop_palette[idx % len(stop_palette)]
+                        dur_str = f"{row['DURATION_MIN']:.0f} min" if row['DURATION_MIN'] < 60 else f"{row['DURATION_MIN']/60:.1f} hrs"
+                        popup_text = (f"Stop #{row['STOP_ID']+1}<br>"
+                                      f"Arrive: {row['ARRIVAL']}<br>"
+                                      f"Depart: {row['DEPARTURE']}<br>"
+                                      f"Duration: {dur_str}<br>"
+                                      f"Points: {row['POINT_COUNT']}")
+                        if row.get('SOURCE_FILE'):
+                            popup_text += f"<br>Source: {row['SOURCE_FILE']}"
+                        folium.Circle(
+                            location=[row['CENTER_LAT'], row['CENTER_LON']],
+                            radius=stop_radius if 'stop_radius' in dir() else 50,
+                            color=color, fill=True, fill_color=color, fill_opacity=0.3,
+                            popup=popup_text
+                        ).add_to(stop_map)
+                        folium.Marker(
+                            [row['CENTER_LAT'], row['CENTER_LON']],
+                            tooltip=f"Stop #{row['STOP_ID']+1} ({dur_str})",
+                            icon=folium.Icon(color=color if color in ['red','blue','green','orange','purple'] else 'red', icon='pause', prefix='fa')
+                        ).add_to(stop_map)
+
+                    # Fit bounds
+                    if len(stops_result) > 0:
+                        stop_lats = stops_result['CENTER_LAT'].tolist()
+                        stop_lons = stops_result['CENTER_LON'].tolist()
+                        sw = [min(stop_lats)-0.001, min(stop_lons)-0.001]
+                        ne = [max(stop_lats)+0.001, max(stop_lons)+0.001]
+                        stop_map.fit_bounds([sw, ne])
+
+                    stop_map.to_streamlit()
+
+        with adv_tab2:
+            # --- Co-Location / Proximity Analysis (Feature #3) ---
+            st.subheader("Co-Location / Proximity Analysis")
+            st.caption("Detect when and where two subjects (from different source files) were at the same place at the same time.")
+
+            if 'SOURCE_FILE' not in preview_data.columns or preview_data['SOURCE_FILE'].nunique() < 2:
+                st.info("Co-location analysis requires **2 or more source files** loaded simultaneously. Upload multiple files to use this feature.")
+            else:
+                sources = sorted(preview_data['SOURCE_FILE'].unique())
+                st.write(f"**{len(sources)} source files loaded:** {', '.join(sources)}")
+
+                coloc_time_cols = [c for c in preview_data.columns if 'TIME' in c.upper() or 'DATE' in c.upper()]
+                if not coloc_time_cols:
+                    st.warning("No date/time columns detected. Co-location analysis requires time data.")
+                else:
+                    coloc_c1, coloc_c2, coloc_c3 = st.columns(3)
+                    with coloc_c1:
+                        coloc_time_col = st.selectbox("Time Column", options=coloc_time_cols, key="coloc_time_col")
+                    with coloc_c2:
+                        coloc_radius = st.number_input("Proximity Radius (m)", min_value=5, max_value=5000, value=50, step=5, key="coloc_radius",
+                                                       help="Maximum distance between two subjects to be considered co-located")
+                    with coloc_c3:
+                        coloc_time_window = st.number_input("Time Window (min)", min_value=1, max_value=1440, value=10, step=1, key="coloc_window",
+                                                            help="Maximum time difference between observations")
+
+                    if st.button("Run Co-Location Analysis", key="run_coloc"):
+                        with st.spinner("Analyzing co-location events... This may take a moment for large datasets."):
+                            coloc_result = cached_compute_colocation(preview_data, coloc_time_col, coloc_radius, coloc_time_window)
+                            safe_session_set('coloc_results', coloc_result)
+
+                    coloc_result = safe_session_get('coloc_results')
+                    if coloc_result is not None and isinstance(coloc_result, pandas.DataFrame) and not coloc_result.empty:
+                        st.markdown(f"### {len(coloc_result)} Co-Location Event(s) Detected")
+
+                        col_m1, col_m2, col_m3 = st.columns(3)
+                        with col_m1:
+                            st.metric("Total Events", len(coloc_result))
+                        with col_m2:
+                            avg_dist = coloc_result['DISTANCE_M'].mean()
+                            st.metric("Avg Distance", f"{avg_dist:.1f} m")
+                        with col_m3:
+                            pairs = coloc_result.groupby(['SOURCE_A','SOURCE_B']).size().reset_index(name='count')
+                            st.metric("Subject Pairs", len(pairs))
+
+                        # Show pair breakdown
+                        if len(pairs) > 1:
+                            st.markdown("**Events per subject pair:**")
+                            for _, pair_row in pairs.iterrows():
+                                st.write(f"- {pair_row['SOURCE_A']} ↔ {pair_row['SOURCE_B']}: **{pair_row['count']}** events")
+
+                        st.dataframe(coloc_result, use_container_width=True)
+                        st.download_button("Download Co-Location CSV", data=coloc_result.to_csv(index=False),
+                                           file_name="Fetch_CoLocation.csv", key="dl_coloc")
+
+                        # Map co-location events
+                        st.markdown("### Co-Location Map")
+                        coloc_map = leafmap.Map()
+                        coloc_map.add_basemap(basemap='ROADMAP')
+                        coloc_map.add_basemap(basemap='TERRAIN')
+                        coloc_map.add_basemap(basemap='HYBRID')
+                        coloc_map.add_basemap(basemap='CartoDB.DarkMatter')
+
+                        for idx, row in coloc_result.iterrows():
+                            popup_text = (f"Co-Location #{idx+1}<br>"
+                                          f"{row['SOURCE_A']} ↔ {row['SOURCE_B']}<br>"
+                                          f"Time A: {row['TIME_A']}<br>"
+                                          f"Time B: {row['TIME_B']}<br>"
+                                          f"Distance: {row['DISTANCE_M']} m<br>"
+                                          f"Time Diff: {row['TIME_DIFF_MIN']} min")
+                            # Draw line between the two points
+                            folium.PolyLine(
+                                locations=[[row['LAT_A'], row['LON_A']], [row['LAT_B'], row['LON_B']]],
+                                color='red', weight=2, opacity=0.8
+                            ).add_to(coloc_map)
+                            # Midpoint marker
+                            folium.Marker(
+                                [row['MIDPOINT_LAT'], row['MIDPOINT_LON']],
+                                tooltip=f"Co-Location #{idx+1} ({row['DISTANCE_M']}m, {row['TIME_DIFF_MIN']}min)",
+                                popup=popup_text,
+                                icon=folium.Icon(color='red', icon='users', prefix='fa')
+                            ).add_to(coloc_map)
+
+                        # Fit bounds
+                        all_lats = coloc_result['MIDPOINT_LAT'].tolist()
+                        all_lons = coloc_result['MIDPOINT_LON'].tolist()
+                        if all_lats:
+                            sw = [min(all_lats)-0.001, min(all_lons)-0.001]
+                            ne = [max(all_lats)+0.001, max(all_lons)+0.001]
+                            coloc_map.fit_bounds([sw, ne])
+
+                        coloc_map.to_streamlit()
+
+                    elif coloc_result is not None and isinstance(coloc_result, pandas.DataFrame) and coloc_result.empty:
+                        if safe_session_get('coloc_results') is not None:
+                            st.info("No co-location events found with the current parameters. Try increasing the radius or time window.")
+
+        with adv_tab3:
+            # --- Coordinate Tools (Feature #6) ---
+            st.subheader("Coordinate Format Converter")
+            st.caption("Convert coordinates between formats or inspect what Fetch detected during import.")
+
+            conv_tab1, conv_tab2 = st.tabs(["Single Conversion", "UTM Converter"])
+
+            with conv_tab1:
+                st.markdown("Convert a single coordinate value between formats.")
+                coord_input = st.text_input("Enter coordinate (DMS, DDM, or Decimal)",
+                                             placeholder='e.g. 40°44\'54"N  or  40 44.9 N  or  40.748333',
+                                             key="coord_convert_input")
+                if coord_input:
+                    parsed = parse_coordinate_value(coord_input)
+                    if parsed is not None:
+                        # Show all formats
+                        abs_val = abs(parsed)
+                        d = int(abs_val)
+                        m_full = (abs_val - d) * 60
+                        m = int(m_full)
+                        s = (m_full - m) * 60
+                        sign = '-' if parsed < 0 else ''
+                        st.success(f"**Decimal:** {parsed:.6f}")
+                        st.write(f"**DMS:** {sign}{d}° {m}' {s:.2f}\"")
+                        st.write(f"**DDM:** {sign}{d}° {m_full:.4f}'")
+                    else:
+                        st.error("Could not parse the coordinate. Supported formats: decimal (40.7484), DMS (40°44'54\"N), DDM (40°44.9'N)")
+
+            with conv_tab2:
+                st.markdown("Convert UTM coordinates to latitude/longitude.")
+                utm_c1, utm_c2, utm_c3 = st.columns(3)
+                with utm_c1:
+                    utm_zone = st.number_input("Zone Number", min_value=1, max_value=60, value=17, key="utm_zone")
+                with utm_c2:
+                    utm_letter = st.text_input("Zone Letter", value="T", max_chars=1, key="utm_letter")
+                with utm_c3:
+                    utm_hemisphere = st.radio("Hemisphere", options=["Northern", "Southern"], horizontal=True, key="utm_hemi")
+
+                utm_e_col, utm_n_col = st.columns(2)
+                with utm_e_col:
+                    utm_easting = st.number_input("Easting (m)", min_value=100000.0, max_value=999999.0, value=630000.0, step=1.0, key="utm_east")
+                with utm_n_col:
+                    utm_northing = st.number_input("Northing (m)", min_value=0.0, max_value=9999999.0, value=4833000.0, step=1.0, key="utm_north")
+
+                if st.button("Convert UTM", key="convert_utm"):
+                    try:
+                        letter = utm_letter.upper() if utm_letter else ('N' if utm_hemisphere == "Northern" else 'S')
+                        lat, lon = utm_to_latlon(utm_easting, utm_northing, utm_zone, letter)
+                        st.success(f"**Latitude:** {lat:.6f}  |  **Longitude:** {lon:.6f}")
+                    except Exception as e:
+                        st.error(f"Conversion error: {str(e)}")
+
+            # Show coordinate format diagnostics for loaded data
+            if preview_data is not None:
+                st.markdown("---")
+                st.subheader("Loaded Data Coordinate Diagnostics")
+                for coord_col in ['LATITUDE', 'LONGITUDE']:
+                    if coord_col in preview_data.columns:
+                        fmt = detect_coordinate_format(preview_data[coord_col])
+                        sample = preview_data[coord_col].dropna().head(3).tolist()
+                        st.write(f"**{coord_col}**: Detected format = `{fmt}` — Sample values: {sample}")
+
     # Reset one-shot rerun guard so future timezone conversions can trigger a rerun again
     if safe_session_get('_tz_conversion_rerun_done'):
         try:
