@@ -2674,99 +2674,156 @@ def get_file_encoding(infile):      #checks file encoding
  
 # 
 
-def create_kml_tour(df, output_file, altitude, tilt, linger, time_column, icon, footprint, radii):
+def _compute_bearing(lat1, lon1, lat2, lon2):
+    """Compute initial bearing (degrees 0-360) from point 1 to point 2."""
+    lat1, lon1, lat2, lon2 = radians(lat1), radians(lon1), radians(lat2), radians(lon2)
+    dlon = lon2 - lon1
+    x = sin(dlon) * cos(lat2)
+    y = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(dlon)
+    bearing = atan2(x, y)
+    return (degrees(bearing) + 360) % 360
+
+
+def _haversine_km(lat1, lon1, lat2, lon2):
+    """Return distance in km between two lat/lon points."""
+    R = 6371.0
+    dlat = radians(lat2 - lat1)
+    dlon = radians(lon2 - lon1)
+    a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2) ** 2
+    return 2 * R * asin(a ** 0.5)
+
+
+def create_kml_tour(df, output_file, altitude, tilt, linger, time_column, icon, footprint, radii,
+                    fly_mode="smooth", kml_obj=None):
     """
-    Creates a KML file with a Google Earth tour from a DataFrame.
+    Creates a KML tour (and placemarks + path line) either into a new KML or
+    into an existing *kml_obj* so tour + placemarks live in one file.
 
     Parameters:
-    df (DataFrame): A DataFrame with 'longitude', 'latitude', and 'time' columns.
-    output_file (str): Path to the output KML file.
-    altitude (int): Camera height in meters.
-    tilt (int): Camera tilt.
-    linger (float): Seconds to rest on each point.
-    time_column (str): Column name for time data.
-    icon (str): Icon style for map points.
-    footprint (bool): Indicates if the data includes radius/area information.
-    radii (str): Column name for radius data.
+        df: DataFrame with LATITUDE / LONGITUDE columns.
+        output_file: Path to save the KML file (used only when kml_obj is None).
+        altitude: Camera height in meters (int).
+        tilt: Camera tilt in degrees (int).
+        linger: Seconds to linger at each point (float).
+        time_column: Column name for timestamps, or None.
+        icon: Icon style key into selected_icon dict.
+        footprint: Whether to draw radius polygons.
+        radii: Column name for radius data.
+        fly_mode: 'smooth' for cinematic flight, 'bounce' for default Google Earth hop.
+        kml_obj: Optional existing simplekml.Kml to append tour into.
     """
     try:
         altitude = int(altitude)
         tilt = int(tilt)
         linger = float(linger)
-        kml = simplekml.Kml()
+
+        kml = kml_obj if kml_obj is not None else simplekml.Kml()
         tour = kml.newgxtour(name="Fetch Tour")
         playlist = tour.newgxplaylist()
 
-        # Ensure that 'longitude', 'latitude', and 'time' columns are present
         if 'LONGITUDE' not in df.columns or 'LATITUDE' not in df.columns:
             raise ValueError("DataFrame must contain 'LONGITUDE' and 'LATITUDE' columns.")
-        
-        # Use centralized coordinate cleaning
+
+        # Coordinate cleaning
         valid_df, skipped_count = filter_valid_coordinates(df, 'LATITUDE', 'LONGITUDE')
         valid_count = len(valid_df)
-        
-        # Notify user if records were skipped
+
         if skipped_count > 0:
-            print(f"Skipped {skipped_count} record(s) that were missing latitude or longitude values for KML tour.")
-        
-        # Check if we have any valid records left
+            st.warning(f"⚠️ Skipped {skipped_count} record(s) missing coordinates for KML tour.")
+
         if valid_count == 0:
-            print("No valid records found for KML tour generation.")
+            st.warning("No valid records found for KML tour generation.")
             return
-        
-        # Convert the 'TIME' column to datetime objects if present
+
+        # Convert time column
         if time_column is not None:
             try:
                 valid_df[time_column] = pandas.to_datetime(valid_df[time_column])
             except ValueError:
                 valid_df[time_column] = pandas.to_datetime(valid_df[time_column], utc=True)
                 valid_df[time_column] = valid_df[time_column].dt.tz_convert('UTC')
-        
-        # Iterate through the points in the DataFrame
-        for idx, row in valid_df.iterrows():
+
+        # Determine fly-to mode
+        gx_flyto_mode = simplekml.GxFlyToMode.smooth if fly_mode == "smooth" else simplekml.GxFlyToMode.bounce
+
+        # Collect coords for path LineString
+        path_coords = []
+        rows_list = list(valid_df.iterrows())
+
+        for i, (idx, row) in enumerate(rows_list):
             try:
-                lon, lat = row['LONGITUDE'], row['LATITUDE']
+                lon, lat = float(row['LONGITUDE']), float(row['LATITUDE'])
+                path_coords.append((lon, lat))
+
                 description_lines = [f"{key}: {value}" for key, value in row.items()]
                 description = "\n".join(description_lines)
-                
-                placemark = kml.newpoint(name=f"{row[time_column]}" if time_column else f"{row['LATITUDE']}, {row['LONGITUDE']}", coords=[(lon, lat)], description=description)
+
+                placemark = kml.newpoint(
+                    name=f"{row[time_column]}" if time_column else f"{lat}, {lon}",
+                    coords=[(lon, lat)],
+                    description=description
+                )
                 placemark.style.iconstyle.icon.href = selected_icon[icon]
 
                 if footprint and radii:
                     rad = row[radii]
-                    polycircle = polycircles.Polycircle(latitude=float(lat),
-                                                        longitude=float(lon),
-                                                        radius=float(rad),
-                                                        number_of_vertices=72)
-                    pol = kml.newpolygon(name=f"{lat}, {lon}, {rad}", outerboundaryis=polycircle.to_kml())
+                    polycircle = polycircles.Polycircle(
+                        latitude=lat, longitude=lon,
+                        radius=float(rad), number_of_vertices=72
+                    )
+                    pol = kml.newpolygon(
+                        name=f"{lat}, {lon}, {rad}",
+                        outerboundaryis=polycircle.to_kml()
+                    )
                     pol.style.polystyle.color = get_footprint_color(icon_Color=icon)
-                
-                # Add a camera or look-at point for the tour
-                flyto = playlist.newgxflyto(gxduration=3.0)
+
+                # --- Compute smart heading (bearing toward next point) ---
+                if i + 1 < len(rows_list):
+                    next_row = rows_list[i + 1][1]
+                    next_lat, next_lon = float(next_row['LATITUDE']), float(next_row['LONGITUDE'])
+                    heading = _compute_bearing(lat, lon, next_lat, next_lon)
+                    dist_km = _haversine_km(lat, lon, next_lat, next_lon)
+                else:
+                    # Last point: keep heading from previous leg (or 0)
+                    heading = heading if i > 0 else 0  # noqa: F821 — heading set in prior iteration
+                    dist_km = 0
+
+                # --- Scale fly duration by distance (1s min, 8s max) ---
+                fly_duration = max(1.0, min(8.0, dist_km * 0.5 + 1.0))
+
+                flyto = playlist.newgxflyto(gxduration=fly_duration)
+                flyto.gxflytomode = gx_flyto_mode
                 flyto.camera.longitude = lon
                 flyto.camera.latitude = lat
                 flyto.camera.altitude = altitude
-                flyto.camera.heading = 0
+                flyto.camera.altitudemode = simplekml.AltitudeMode.relativetoground
+                flyto.camera.heading = heading
                 flyto.camera.tilt = tilt
                 flyto.camera.roll = 0
-                
-                # Add the time and date
-                if time_column is not None:
-                    flyto.when = row[time_column].isoformat() # Convert datetime to ISO format
-            
-                # Optionally, you can add a wait period between points
-                playlist.newgxwait(gxduration=linger)  # Wait for the specified linger duration
-            
-            except AttributeError as e:
-                print(f"Error at index {idx}: {e}")
-            except TypeError as e:
-                print(f"Error at index {idx}: {e}")
 
-        # Save the KML to the specified output file
-        kml.save(output_file)
-        print(f"KML file saved as {output_file}")
-    except TypeError:
-        st.error("Error creating KML tour. Check for errors in the data set.")
+                if time_column is not None:
+                    flyto.when = row[time_column].isoformat()
+
+                playlist.newgxwait(gxduration=linger)
+
+            except (AttributeError, TypeError) as e:
+                st.warning(f"Tour: skipping point {idx}: {e}")
+
+        # Add a LineString showing the full travel path
+        if len(path_coords) >= 2:
+            line = kml.newlinestring(name="Travel Path")
+            line.coords = path_coords
+            line.style.linestyle.color = simplekml.Color.changealphaint(180, simplekml.Color.cyan)
+            line.style.linestyle.width = 3
+            line.altitudemode = simplekml.AltitudeMode.clamptoground
+
+        # Save only if we created the KML ourselves (not injected via kml_obj)
+        if kml_obj is None:
+            kml.save(output_file)
+            st.info(f"KML tour saved as {output_file}")
+
+    except TypeError as e:
+        st.error(f"Error creating KML tour. Check for errors in the data set. ({e})")
 
 def create_kml(df_in, outfile):
     try:
@@ -2774,7 +2831,7 @@ def create_kml(df_in, outfile):
 
         # Streamlit UI for selecting columns
         st.subheader("Design Your KML Map")
-        
+
         # Only show color selector if there's no POINT_COLOR column
         if 'POINT_COLOR' not in df_in.columns:
             icon = st.selectbox("Select Map Point Icon Style", options=icon_options)
@@ -2783,66 +2840,87 @@ def create_kml(df_in, outfile):
             st.info("Using colors selected during file upload")
 
         label_for_icons = st.selectbox("Map Icon Labels", options=headers)
-        
+
         footprint = st.checkbox("Data set includes radius/area information", value=False)
         radii = None
         if footprint:
             radii = st.selectbox("Radius/Distance-from-Point in Meters", options=headers)
-        
+
+        # --- Path line option ---
+        add_path_line = st.checkbox("Include travel path line", value=False,
+                                    help="Draws a LineString connecting all points in order.")
+
+        # --- Output format ---
+        output_format = st.radio("Output Format", options=["KML", "KMZ"], horizontal=True,
+                                 help="KMZ is a compressed KML — smaller file size.")
+
         tour = st.checkbox("Include KML Tour", value=False)
-        if tour:     # Tour Settings
+        if tour:
             st.subheader("Design Tour Settings")
             there_are_dates = st.checkbox("Data set includes date/time information", value=False)
             if there_are_dates:
                 time_column = st.selectbox("Date/Time Column", options=headers)
             else:
                 time_column = None
-            tour_altitude = st.selectbox("Tour Altitude (Meters)", options=['50','150', '250', '300', '750', '1500', '10000'], index=2)
-            tour_linger_time = st.selectbox("Tour Linger Time (Seconds)", options=['1', '2', '3', '4', '5', '10', '15'], index=3)
-            tour_tilt = st.selectbox("Tour Tilt", options=['0', '5', '10', '20'], index=1)
+            tour_altitude = st.selectbox("Tour Altitude (Meters)", options=[50, 150, 250, 300, 750, 1500, 10000], index=2)
+            tour_linger_time = st.selectbox("Tour Linger Time (Seconds)", options=[1, 2, 3, 4, 5, 10, 15], index=3)
+            tour_tilt = st.selectbox("Tour Tilt", options=[0, 5, 10, 20], index=1)
+            tour_fly_mode = st.radio("Camera Fly Mode", options=["smooth", "bounce"], index=0, horizontal=True,
+                                     help="Smooth = cinematic continuous flight. Bounce = camera zooms out and back in between points.")
 
     except AttributeError:
-        print("Attribute error on variable headers in createkml")
         st.error("Check for errors in column selection.")
 
     if st.button("Generate KML"):
-        filename = "MITE_KML_Map" + datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+        filename = "Fetch_KML_Map_" + datetime.datetime.now().strftime("%Y%m%d%H%M%S")
         if not filename:
             st.error("Map Name Required")
         else:
             try:
-                # Use centralized coordinate cleaning
+                # Coordinate cleaning
                 valid_df, skipped_count = filter_valid_coordinates(df_in, 'LATITUDE', 'LONGITUDE')
                 valid_count = len(valid_df)
-                
-                # Notify user if records were skipped
+
                 if skipped_count > 0:
-                    st.warning(f"⚠️ Skipped {skipped_count} record(s) that were missing latitude or longitude values. {valid_count} valid records will be processed in KML.")
-                
-                # Check if we have any valid records left
+                    st.warning(f"⚠️ Skipped {skipped_count} record(s) missing coordinates. {valid_count} valid records will be processed.")
+
                 if valid_count == 0:
                     st.error("No valid records found for KML generation. All records are missing latitude or longitude values.")
                     return
-                
+
                 kml = simplekml.Kml()
                 Label = label_for_icons
-                
-                for idx, row in valid_df.iterrows():
-                    lon, lat = row['LONGITUDE'], row['LATITUDE']
-                    description_lines = [f"{key}: {value}" for key, value in row.items()]
-                    descript = "\n".join(description_lines)      
-                    lab = row[Label]
-                    long = re.findall(r'([0-9.-]+)', str(lon))[0]
-                    lati = re.findall(r'([0-9.-]+)', str(lat))[0]
 
-                    point = kml.newpoint(name=lab, coords=[(float(long), float(lati))], description=descript)
-                    # Use point color from dataframe if available, otherwise use selected icon
-                    if 'POINT_COLOR' in row:
-                        # Convert hex color to KML color format (aabbggrr)
-                        hex_color = row['POINT_COLOR'].lstrip('#')
+                # --- Folder grouping by SOURCE_FILE ---
+                has_source = 'SOURCE_FILE' in valid_df.columns
+                folders = {}  # source_file -> simplekml.Folder
+
+                path_coords = []  # for optional LineString
+
+                for idx, row in valid_df.iterrows():
+                    lon, lat = float(row['LONGITUDE']), float(row['LATITUDE'])
+                    path_coords.append((lon, lat))
+
+                    description_lines = [f"{key}: {value}" for key, value in row.items()]
+                    descript = "\n".join(description_lines)
+                    lab = row[Label]
+
+                    # Pick the target container (folder or root kml)
+                    if has_source:
+                        src = str(row.get('SOURCE_FILE', 'Unknown'))
+                        if src not in folders:
+                            folders[src] = kml.newfolder(name=src)
+                        container = folders[src]
+                    else:
+                        container = kml
+
+                    point = container.newpoint(name=lab, coords=[(lon, lat)], description=descript)
+
+                    # Apply icon + color
+                    if 'POINT_COLOR' in row and pandas.notna(row.get('POINT_COLOR')):
+                        hex_color = str(row['POINT_COLOR']).lstrip('#')
                         rgb = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
                         kml_color = simplekml.Color.rgb(*rgb)
-                        
                         point.style.iconstyle.icon.href = selected_icon[icon]
                         point.style.iconstyle.color = kml_color
                     else:
@@ -2851,43 +2929,56 @@ def create_kml(df_in, outfile):
                     if footprint and radii:
                         rad = row[radii]
                         polycircle = polycircles.Polycircle(
-                            latitude=float(lati),
-                            longitude=float(long),
-                            radius=float(rad),
-                            number_of_vertices=72
+                            latitude=lat, longitude=lon,
+                            radius=float(rad), number_of_vertices=72
                         )
-
-                        pol = kml.newpolygon(name=f"{lati}, {long}, {rad}", outerboundaryis=polycircle.to_kml())
-                        # Use point color for footprint if available
-                        if 'POINT_COLOR' in row:
+                        pol = container.newpolygon(
+                            name=f"{lat}, {lon}, {rad}",
+                            outerboundaryis=polycircle.to_kml()
+                        )
+                        if 'POINT_COLOR' in row and pandas.notna(row.get('POINT_COLOR')):
                             pol.style.polystyle.color = kml_color
                         else:
                             pol.style.polystyle.color = get_footprint_color(icon_Color=icon)
-                            
+
+                # --- Optional travel path LineString ---
+                if add_path_line and len(path_coords) >= 2:
+                    line = kml.newlinestring(name="Travel Path")
+                    line.coords = path_coords
+                    line.style.linestyle.color = simplekml.Color.changealphaint(180, simplekml.Color.cyan)
+                    line.style.linestyle.width = 3
+                    line.altitudemode = simplekml.AltitudeMode.clamptoground
+
             except Exception as e:
                 st.error(f"Error generating KML: {e}")
                 return
 
-            if not tour:
-                # Generate normal KML file
+            # --- Tour: inject into the same KML object ---
+            if tour:
+                create_kml_tour(
+                    df=valid_df, output_file=outfile,
+                    altitude=tour_altitude, tilt=tour_tilt,
+                    linger=tour_linger_time, time_column=time_column,
+                    icon=icon, footprint=False, radii=None,  # placemarks already added above
+                    fly_mode=tour_fly_mode, kml_obj=kml
+                )
+
+            # --- Save & download ---
+            if output_format == "KMZ":
+                kmz_outfile = outfile.replace('.kml', '.kmz')
+                kml.savekmz(kmz_outfile)
+                with open(kmz_outfile, 'rb') as f:
+                    file_data = f.read()
+                dl_name = "Fetch_KML_Download.kmz"
+                st.download_button("Download KMZ", data=file_data, file_name=dl_name)
+                st.success(f"KMZ file generated: {dl_name}")
+            else:
                 kml.save(outfile)
                 with open(outfile, 'rb') as f:
-                    kml_data = f.read()
-
-                st.download_button("Download KML", data=kml_data, file_name="Fetch_KML_Download.kml")
-
-            if tour:
-                # Generate the KML tour file
-                tourfile = 'tour.kml'
-                create_kml_tour(df=valid_df, output_file=tourfile, altitude=tour_altitude, 
-                              tilt=tour_tilt, linger=tour_linger_time, time_column=time_column, 
-                              icon=icon, footprint=footprint, radii=radii)
-                with open(tourfile, 'rb') as f:
-                    tour_data = f.read()
-
-                st.download_button("Download KML Tour", data=tour_data, file_name="Fetch_KML_Tour.kml")
-
-            st.success(f"KML file has been stored to: {outfile}")
+                    file_data = f.read()
+                dl_name = "Fetch_KML_Download.kml"
+                st.download_button("Download KML", data=file_data, file_name=dl_name)
+                st.success(f"KML file generated: {dl_name}")
 
 
 @st.cache_data
@@ -3326,7 +3417,7 @@ def declutterer(in_df, date_column):
         return in_df
 
 def convert_kml_2_DF(kml_file):
-    if type(kml_file) == str:   # used for parsing kml collected from kmz
+    if isinstance(kml_file, str):   # used for parsing kml collected from kmz
         tree = ET.ElementTree(ET.fromstring(kml_file))
     else:                    # used for parsing a direct kml submission
         tree = ET.parse(kml_file)
@@ -3369,17 +3460,7 @@ def convert_kml_2_DF(kml_file):
                     data['altitude'] = float(coord_values[2])
                     keys_seen.add('altitude')
 
-        # Extract all extended data fields
-        extended_data = placemark.findall('.//kml:ExtendedData/kml:Data', ns)
-        for ed in extended_data:
-            key = ed.attrib.get('name')
-            if key and key.lower() not in keys_seen:
-                value = ed.find('kml:value', ns).text if ed.find('kml:value', ns) is not None else ''
-                data[key] = value
-                keys_seen.add(key.lower())
-
-        # Extract all extended data fields (both Data and SchemaData/SimpleData)
-        # Handle Data elements
+        # Extract ExtendedData/Data elements
         extended_data = placemark.findall('.//kml:ExtendedData/kml:Data', ns)
         for ed in extended_data:
             key = ed.attrib.get('name')
@@ -3409,7 +3490,6 @@ def convert_kml_2_DF(kml_file):
 
     # Drop rows with missing latitude or longitude
     df = df.dropna(subset=['latitude', 'longitude'])
-    # print(df)
     return df
 
 
