@@ -750,7 +750,7 @@ def make_IPaddress_Map():   #used to map ips
 
 
 def make_map(in_df):       #bring in pandas dataframe
-    mapbox_token = "pk.eyJ1Ijoibm9ydGhsb29wY29uc3VsdGluZyIsImEiOiJjbTIyMng3ZmYwMnRyMmtvaGx6NnJvdnFpIn0.ixLwI99ZfD6vtsM_hoxDtA"
+    mapbox_token = "pk.eyJ1Ijplm9ydGhsb29wY29uc3VsdGluZyIsImEiOiJjbTIyMng3ZmYwMnRyMmtvaGx6NnJvdnFpIn0.ixLwI99ZfD6vtsM_hoxDtA"
     valid_records, skipped_count = filter_valid_coordinates(in_df, 'LATITUDE', 'LONGITUDE')
     valid_count = len(valid_records)
 
