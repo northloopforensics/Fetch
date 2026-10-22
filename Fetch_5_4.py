@@ -927,6 +927,9 @@ def render_leafmap(m, height: int = 600, download_name: Optional[str] = None, do
         st.download_button(label="Download Map HTML", data=fix_osm_tiles_for_export(html),
                            file_name=download_name, key=download_key)
 
+# Fragments rerun only the decorated function on widget interaction instead of the whole script.
+_fragment = getattr(st, "fragment", None) or getattr(st, "experimental_fragment", None) or (lambda f: f)
+
 now = datetime.datetime.now()
 st.set_page_config(
    page_title="Fetch v5.3",
@@ -1064,7 +1067,7 @@ def compute_hotspots(df: pandas.DataFrame, radius_m: float, min_samples: int, ti
     return df, summary_df
 
 # Cached wrapper so repeated UI reruns don't recompute unnecessarily
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=10, ttl=3600)
 def cached_compute_hotspots(df: pandas.DataFrame, radius_m: float, min_samples: int, time_col: Optional[str], trim_chaining: bool = True):
     return compute_hotspots(df, radius_m, min_samples, time_col, trim_chaining=trim_chaining)
 
@@ -1331,7 +1334,7 @@ def compute_colocation(df: pandas.DataFrame, time_col: str,
         result = result.sort_values('TIME_A').reset_index(drop=True)
     return result
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=10, ttl=3600)
 def cached_compute_colocation(df: pandas.DataFrame, time_col: str, radius_m: float, time_window_min: float):
     return compute_colocation(df, time_col, radius_m, time_window_min)
 
@@ -1406,7 +1409,7 @@ def compute_stops(df: pandas.DataFrame, time_col: str, radius_m: float = 50.0,
 
     return pandas.DataFrame(stops)
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=20, ttl=3600)
 def cached_compute_stops(df: pandas.DataFrame, time_col: str, radius_m: float,
                          min_duration_min: float, source_file: Optional[str] = None):
     return compute_stops(df, time_col, radius_m, min_duration_min, source_file)
@@ -1771,6 +1774,7 @@ def get_point_at_distance(lat1, lon1, d, bearing, R=6371):  # used to draw tower
     )
     return (degrees(lat2), degrees(lon2),)
 
+@_fragment
 def make_geofence_map():
     # --- Geofence Manager State ---
     if safe_session_get('geofences') is None:
@@ -2076,7 +2080,12 @@ def make_geofence_map():
     # embedding the map HTML. This avoids the "component failed to load" reset loop.
     outputmap = None
     try:
-        outputmap = st_folium(geomap, width=1100, height=600, key="geofence_map")
+        try:
+            # Only drawing changes trigger a rerun; panning/zooming no longer reruns the app.
+            outputmap = st_folium(geomap, width=1100, height=600, key="geofence_map",
+                                  returned_objects=["last_active_drawing"])
+        except TypeError:
+            outputmap = st_folium(geomap, width=1100, height=600, key="geofence_map")
     except Exception as e:
         # Log the error for debugging but don't crash the app; render HTML fallback.
         try:
@@ -2301,6 +2310,7 @@ def fix_osm_tiles_for_export(html: str) -> str:
     html = osm_tilelayer_re.sub(r'L.osmHeaderTileLayer(\1', html)
     return html
 
+@_fragment
 def make_IPaddress_Map():   #used to map ips
     # help_Box = st.expander(label="Help")
     user_location = st.text_input("Place Name or Address - Use to Add a Relevant Location to the Map (Place e-mail received, point of comparison, etc)")
@@ -2381,6 +2391,7 @@ def make_IPaddress_Map():   #used to map ips
         #     st.error("Input Data is required OR No location data was located from the provided data.")
 
 
+@_fragment
 def make_map(in_df):       #bring in pandas dataframe
     valid_records, skipped_count = filter_valid_coordinates(in_df, 'LATITUDE', 'LONGITUDE')
     valid_count = len(valid_records)
@@ -3409,6 +3420,7 @@ def create_kml_tour(df, output_file, altitude, tilt, linger, time_column, icon, 
     except TypeError as e:
         st.error(f"Error creating KML tour. Check for errors in the data set. ({e})")
 
+@_fragment
 def create_kml(df_in, outfile):
     try:
         headers = df_in.columns.to_list()
@@ -3565,7 +3577,7 @@ def create_kml(df_in, outfile):
                 st.success(f"KML file generated: {dl_name}")
 
 
-@st.cache_data
+@st.cache_data(max_entries=10, ttl=3600)
 def prepare_datetime_column(df, date_column):
     """Prepare datetime column with proper conversion and caching for performance"""
     df_copy = df.copy()
@@ -4075,12 +4087,12 @@ def convert_kml_2_DF(kml_file):
     return df
 
 
-@st.cache_data(max_entries=20, show_spinner="Reading file...")
-def _parse_uploaded_file(name: str, data: bytes, enc: str):
-    """Parse an uploaded file once per unique content; returns (df or None, [(st_level, message), ...])."""
+@st.cache_data(max_entries=20, ttl=3600, show_spinner="Reading file...")
+def _parse_uploaded_file(file_key: str, name: str, enc: str, _upload):
+    """Parse an uploaded file once per upload; returns (df or None, [(st_level, message), ...])."""
     notices = []
     lower = name.lower()
-    file = io.BytesIO(data)
+    file = io.BytesIO(_upload.getvalue())
     df = None
     # Excel files: read without inferring header so we can detect custom header rows
     if any(ext in lower for ext in [".xls", ".xlsx"]):
@@ -4216,7 +4228,9 @@ def ingest_multiple_files():
     df_list = []
     for file in uploaded_files:
         try:
-            df, notices = _parse_uploaded_file(file.name, file.getvalue(), selected_encoding or "utf-8")
+            # Keying on the upload id avoids re-hashing the whole file on every rerun.
+            file_key = getattr(file, "file_id", None) or hashlib.md5(file.getvalue()).hexdigest()
+            df, notices = _parse_uploaded_file(file_key, file.name, selected_encoding or "utf-8", file)
         except Exception as e:
             st.error(f"Error processing {file.name}: {str(e)}")
             continue
