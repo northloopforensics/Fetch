@@ -1301,35 +1301,61 @@ def compute_colocation(df: pandas.DataFrame, time_col: str,
             if df_a.empty or df_b.empty:
                 continue
 
-            # For each point in A, find points in B within the time window
-            # Use vectorized pre-filtering by time, then check distance
-            for _, row_a in df_a.iterrows():
-                t_a = row_a['_PARSED_DT']
-                lat_a, lon_a = row_a['LATITUDE'], row_a['LONGITUDE']
+            # Vectorized: binary-search each A time into B's sorted times, then compute distances in bulk.
+            def _to_ns(s):
+                return ((s - pandas.Timestamp(0, tz=s.dt.tz)) // pandas.Timedelta(1, 'ns')).to_numpy(np.int64)
+            ta = _to_ns(df_a['_PARSED_DT'])
+            tb = _to_ns(df_b['_PARSED_DT'])
+            delta_ns = int(time_delta.value)
+            lo = np.searchsorted(tb, ta - delta_ns, side='left')
+            hi = np.searchsorted(tb, ta + delta_ns, side='right')
+            counts = hi - lo
+            lat_a_all = np.radians(df_a['LATITUDE'].to_numpy(float)); lon_a_all = np.radians(df_a['LONGITUDE'].to_numpy(float))
+            lat_b_all = np.radians(df_b['LATITUDE'].to_numpy(float)); lon_b_all = np.radians(df_b['LONGITUDE'].to_numpy(float))
 
-                time_mask = (df_b['_PARSED_DT'] >= t_a - time_delta) & (df_b['_PARSED_DT'] <= t_a + time_delta)
-                candidates = df_b[time_mask]
-
-                for _, row_b in candidates.iterrows():
-                    lat_b, lon_b = row_b['LATITUDE'], row_b['LONGITUDE']
-                    dist = haversine_distance_m(lat_a, lon_a, lat_b, lon_b)
-                    if dist <= radius_m:
-                        events.append({
+            # Chunk A rows so candidate pair arrays stay bounded in memory.
+            max_pairs = 2_000_000
+            start = 0
+            n_a = len(df_a)
+            while start < n_a:
+                end = start
+                pairs = 0
+                while end < n_a and (pairs + counts[end] <= max_pairs or end == start):
+                    pairs += counts[end]
+                    end += 1
+                c = counts[start:end]
+                if pairs:
+                    ia = np.repeat(np.arange(start, end), c)
+                    offsets = np.repeat(np.cumsum(c) - c, c)
+                    ib = np.repeat(lo[start:end], c) + (np.arange(pairs) - offsets)
+                    dphi = lat_b_all[ib] - lat_a_all[ia]
+                    dlam = lon_b_all[ib] - lon_a_all[ia]
+                    a = np.sin(dphi / 2) ** 2 + np.cos(lat_a_all[ia]) * np.cos(lat_b_all[ib]) * np.sin(dlam / 2) ** 2
+                    dist = 2 * 6371000.0 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
+                    hit = dist <= radius_m
+                    if hit.any():
+                        ia_h, ib_h, d_h = ia[hit], ib[hit], dist[hit]
+                        t_a = df_a['_PARSED_DT'].iloc[ia_h].reset_index(drop=True)
+                        t_b = df_b['_PARSED_DT'].iloc[ib_h].reset_index(drop=True)
+                        lat_a = df_a['LATITUDE'].to_numpy(float)[ia_h]; lon_a = df_a['LONGITUDE'].to_numpy(float)[ia_h]
+                        lat_b = df_b['LATITUDE'].to_numpy(float)[ib_h]; lon_b = df_b['LONGITUDE'].to_numpy(float)[ib_h]
+                        events.append(pandas.DataFrame({
                             'SOURCE_A': src_a,
                             'SOURCE_B': src_b,
                             'TIME_A': t_a,
-                            'TIME_B': row_b['_PARSED_DT'],
+                            'TIME_B': t_b,
                             'LAT_A': lat_a,
                             'LON_A': lon_a,
                             'LAT_B': lat_b,
                             'LON_B': lon_b,
-                            'DISTANCE_M': round(dist, 2),
-                            'TIME_DIFF_MIN': round(abs((t_a - row_b['_PARSED_DT']).total_seconds()) / 60, 2),
+                            'DISTANCE_M': np.round(d_h, 2),
+                            'TIME_DIFF_MIN': np.round(np.abs((ta[ia_h] - tb[ib_h]) / 6e10), 2),
                             'MIDPOINT_LAT': (lat_a + lat_b) / 2,
                             'MIDPOINT_LON': (lon_a + lon_b) / 2,
-                        })
+                        }))
+                start = end
 
-    result = pandas.DataFrame(events)
+    result = pandas.concat(events, ignore_index=True) if events else pandas.DataFrame()
     if not result.empty:
         result = result.sort_values('TIME_A').reset_index(drop=True)
     return result
@@ -1365,38 +1391,35 @@ def compute_stops(df: pandas.DataFrame, time_col: str, radius_m: float = 50.0,
     stop_id = 0
     i = 0
     n = len(working)
+    lats = working['LATITUDE'].to_numpy(float)
+    lons = working['LONGITUDE'].to_numpy(float)
+    times = working['_PARSED_DT']
 
     while i < n:
-        # Start a candidate stop
-        cluster_lats = [working.at[i, 'LATITUDE']]
-        cluster_lons = [working.at[i, 'LONGITUDE']]
-        cluster_start = working.at[i, '_PARSED_DT']
-        cluster_end = cluster_start
+        # Running sums keep the centroid O(1) per point instead of re-averaging the whole cluster.
+        sum_lat, sum_lon, k = lats[i], lons[i], 1
         j = i + 1
 
         while j < n:
-            lat_j = working.at[j, 'LATITUDE']
-            lon_j = working.at[j, 'LONGITUDE']
-            centroid_lat = np.mean(cluster_lats)
-            centroid_lon = np.mean(cluster_lons)
-            dist = haversine_distance_m(centroid_lat, centroid_lon, lat_j, lon_j)
-
+            dist = haversine_distance_m(sum_lat / k, sum_lon / k, lats[j], lons[j])
             if dist <= radius_m:
-                cluster_lats.append(lat_j)
-                cluster_lons.append(lon_j)
-                cluster_end = working.at[j, '_PARSED_DT']
+                sum_lat += lats[j]
+                sum_lon += lons[j]
+                k += 1
                 j += 1
             else:
                 break
 
+        cluster_start = times.iat[i]
+        cluster_end = times.iat[j - 1]
         duration = (cluster_end - cluster_start).total_seconds() / 60.0
         point_count = j - i
 
         if duration >= min_duration_min and point_count >= 2:
             stops.append({
                 'STOP_ID': stop_id,
-                'CENTER_LAT': round(np.mean(cluster_lats), 6),
-                'CENTER_LON': round(np.mean(cluster_lons), 6),
+                'CENTER_LAT': round(sum_lat / k, 6),
+                'CENTER_LON': round(sum_lon / k, 6),
                 'ARRIVAL': cluster_start,
                 'DEPARTURE': cluster_end,
                 'DURATION_MIN': round(duration, 2),
