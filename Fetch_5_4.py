@@ -836,7 +836,7 @@ def filter_valid_coordinates(df: pandas.DataFrame, lat_col: str = 'LATITUDE', lo
 def filter_map_radius(df: pandas.DataFrame, radius_col: str, key: str):
     """Select a maximum radius and return eligible records without changing the input."""
     max_radius = st.number_input(
-        "Maximum Radius (meters)", min_value=0.0, value=50.0, step=1.0, key=key,
+        "Maximum Radius (meters)", min_value=0.0, value=100.0, step=1.0, key=key,
         help="Filters out entire records whose radius value is larger than this maximum (in meters), including their map markers and radius shapes. Missing, non-numeric, and non-positive radii are also excluded."
     )
     radius = pandas.to_numeric(df[radius_col], errors='coerce')
