@@ -4806,7 +4806,7 @@ if preview_data is not None:
         make_geofence_map()
     elif _main_sel == _main_opts[3]:
         st.header(t("hdr_advanced_analysis"))
-        _adv_opts = [t("tab_stop_dwell"), t("tab_colocation"), t("tab_coord_tools")]
+        _adv_opts = [t("tab_stop_dwell"), t("tab_colocation")]
         _adv_sel = nav_selector("Analysis", _adv_opts, key="nav_adv")
 
         if _adv_sel == _adv_opts[0]:
@@ -5024,71 +5024,6 @@ if preview_data is not None:
                     elif coloc_result is not None and isinstance(coloc_result, pandas.DataFrame) and coloc_result.empty:
                         if safe_session_get('coloc_results') is not None:
                             st.info("No co-location events found with the current parameters. Try increasing the radius or time window.")
-
-        elif _adv_sel == _adv_opts[2]:
-            # --- Coordinate Tools (Feature #6) ---
-            st.subheader(t("hdr_coord_converter"))
-            st.caption("Convert coordinates between formats or inspect what Fetch detected during import.")
-
-            conv_tab1, conv_tab2 = st.tabs([t("tab_single_conv"), t("tab_utm_conv")])
-
-            with conv_tab1:
-                st.markdown(t("msg_convert_single"))
-                coord_input = st.text_input(t("lbl_enter_coord"),
-                                             placeholder='e.g. 40°44\'54"N  or  40 44.9 N  or  40.748333',
-                                             key="coord_convert_input")
-                if coord_input:
-                    parsed = parse_coordinate_value(coord_input)
-                    if parsed is not None:
-                        # Show all formats
-                        abs_val = abs(parsed)
-                        d = int(abs_val)
-                        m_full = (abs_val - d) * 60
-                        m = int(m_full)
-                        s = (m_full - m) * 60
-                        sign = '-' if parsed < 0 else ''
-                        st.success(f"**Decimal:** {parsed:.6f}")
-                        st.write(f"**DMS:** {sign}{d}° {m}' {s:.2f}\"")
-                        st.write(f"**DDM:** {sign}{d}° {m_full:.4f}'")
-                    else:
-                        st.error("Could not parse the coordinate. Supported formats: decimal (40.7484), DMS (40°44'54\"N), DDM (40°44.9'N)")
-
-            with conv_tab2:
-                st.markdown(t("msg_convert_utm"))
-                utm_c1, utm_c2, utm_c3 = st.columns(3)
-                with utm_c1:
-                    utm_zone = st.number_input(t("lbl_zone_number"), min_value=1, max_value=60, value=17, key="utm_zone")
-                with utm_c2:
-                    utm_letter = st.text_input(t("lbl_zone_letter"), value="T", max_chars=1, key="utm_letter")
-                with utm_c3:
-                    _hemi_en = ["Northern", "Southern"]
-                    _hemi_tr = [t("northern"), t("southern")]
-                    _hemi_sel = st.radio(t("lbl_hemisphere"), options=_hemi_tr, horizontal=True, key="utm_hemi")
-                    utm_hemisphere = _hemi_en[_hemi_tr.index(_hemi_sel)]
-
-                utm_e_col, utm_n_col = st.columns(2)
-                with utm_e_col:
-                    utm_easting = st.number_input(t("lbl_easting"), min_value=100000.0, max_value=999999.0, value=630000.0, step=1.0, key="utm_east")
-                with utm_n_col:
-                    utm_northing = st.number_input(t("lbl_northing"), min_value=0.0, max_value=9999999.0, value=4833000.0, step=1.0, key="utm_north")
-
-                if st.button(t("btn_convert_utm"), key="convert_utm"):
-                    try:
-                        letter = utm_letter.upper() if utm_letter else ('N' if utm_hemisphere == "Northern" else 'S')
-                        lat, lon = utm_to_latlon(utm_easting, utm_northing, utm_zone, letter)
-                        st.success(f"**Latitude:** {lat:.6f}  |  **Longitude:** {lon:.6f}")
-                    except Exception as e:
-                        st.error(f"Conversion error: {str(e)}")
-
-            # Show coordinate format diagnostics for loaded data
-            if preview_data is not None:
-                st.markdown("---")
-                st.subheader(t("hdr_coord_diag"))
-                for coord_col in ['LATITUDE', 'LONGITUDE']:
-                    if coord_col in preview_data.columns:
-                        fmt = detect_coordinate_format(preview_data[coord_col])
-                        sample = preview_data[coord_col].dropna().head(3).tolist()
-                        st.write(f"**{coord_col}**: Detected format = `{fmt}` — Sample values: {sample}")
 
     # Reset one-shot rerun guard so future timezone conversions can trigger a rerun again
     if safe_session_get('_tz_conversion_rerun_done'):
