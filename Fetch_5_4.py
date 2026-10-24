@@ -836,7 +836,7 @@ def filter_valid_coordinates(df: pandas.DataFrame, lat_col: str = 'LATITUDE', lo
 def filter_map_radius(df: pandas.DataFrame, radius_col: str, key: str):
     """Select a maximum radius and return eligible records without changing the input."""
     max_radius = st.number_input(
-        "Maximum Radius (meters)", min_value=0.0, value=100.0, step=1.0, key=key,
+        "Maximum Radius (meters)", min_value=0.0, value=50.0, step=1.0, key=key,
         help="Filters out entire records whose radius value is larger than this maximum (in meters), including their map markers and radius shapes. Missing, non-numeric, and non-positive radii are also excluded."
     )
     radius = pandas.to_numeric(df[radius_col], errors='coerce')
@@ -950,7 +950,7 @@ _fragment = getattr(st, "fragment", None) or getattr(st, "experimental_fragment"
 
 now = datetime.datetime.now()
 st.set_page_config(
-   page_title="Fetch v5.3",
+   page_title="Fetch v5.4",
    #page_icon="🔴",
    layout="wide",
    initial_sidebar_state="expanded",
@@ -2315,7 +2315,7 @@ def fix_osm_tiles_for_export(html: str) -> str:
 (function(){
   async function fetchOsmTile(url, callback) {
     try {
-      var resp = await fetch(url, {headers: {'X-Requested-With': 'Fetch-Analysis-Tool/5.3'}, mode: 'cors'});
+      var resp = await fetch(url, {headers: {'X-Requested-With': 'Fetch-Analysis-Tool/5.4'}, mode: 'cors'});
       var blob = await resp.blob();
       var reader = new FileReader();
       reader.onload = function () { callback(reader.result); };
@@ -5052,4 +5052,4 @@ with st.expander("Privacy Statement and API Use"):
 
     Fetch is intended to be a free tool available to everyone.  To do this, free resources are used to return information like IP address data.  There are caps on this free usage.  You may run into periods where that cap has been met and these resources are not available. If you would like to explore financial support for the tool to expand these capabilities, I am open to the conversation. Just reach out via the Contact Page on our site.   
     """)
-st.markdown(":orange[© 2026 North Loop Consulting - Fetch_v5.3]")
+st.markdown(":orange[© 2026 North Loop Consulting - Fetch_v5.4]")
