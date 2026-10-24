@@ -833,6 +833,24 @@ def filter_valid_coordinates(df: pandas.DataFrame, lat_col: str = 'LATITUDE', lo
     return clean, (original - len(clean))
 
 
+def filter_map_radius(df: pandas.DataFrame, radius_col: str, key: str):
+    """Select a maximum radius and return eligible records without changing the input."""
+    max_radius = st.number_input(
+        "Maximum Radius (meters)", min_value=0.0, value=50.0, step=1.0, key=key,
+        help="Filters out entire records whose radius value is larger than this maximum (in meters), including their map markers and radius shapes. Missing, non-numeric, and non-positive radii are also excluded."
+    )
+    radius = pandas.to_numeric(df[radius_col], errors='coerce')
+    keep = np.isfinite(radius) & (radius > 0) & (radius <= max_radius)
+    filtered = df.loc[keep].copy().reset_index(drop=True)
+    filtered[radius_col] = radius.loc[keep].to_numpy()
+    excluded = len(df) - len(filtered)
+    if excluded:
+        st.caption(f"Radius filter: excluded {excluded:,} record(s); {len(filtered):,} remain.")
+    if filtered.empty:
+        st.warning("No records match the maximum radius. Increase the limit or select another radius column.")
+    return filtered
+
+
 def detect_and_set_header_from_rows(df: pandas.DataFrame, max_search_rows: int = 15) -> pandas.DataFrame:
     """Inspect the first `max_search_rows` rows of `df` to find a row that contains
     both latitude and longitude column labels (case-insensitive). If found, promote
@@ -2728,6 +2746,10 @@ def make_map(in_df):       #bring in pandas dataframe
                             st.error("No numeric columns found for radius/accuracy information. Please ensure your data contains numeric columns for radius values.")
                         else:
                             radius_value = st.selectbox(label=t("lbl_radius_meters"), options=numeric_columns)
+                            gdf = filter_map_radius(gdf, radius_value, key="marker_max_radius")
+                            if gdf.empty:
+                                return
+                            Map.zoom_to_gdf(gdf)
                             try:
                                 for idx, row in gdf.iterrows():
                                     rad_value = row[radius_value]
@@ -2773,6 +2795,10 @@ def make_map(in_df):       #bring in pandas dataframe
                             st.error("No numeric columns found for radius/accuracy information. Please ensure your data contains numeric columns for radius values.")
                         else:
                             radius_value = st.selectbox(label=t("lbl_radius_meters"), options=numeric_columns)
+                            gdf = filter_map_radius(gdf, radius_value, key="marker_max_radius")
+                            if gdf.empty:
+                                return
+                            Map.zoom_to_gdf(gdf)
                             try:
                                 for idx, row in gdf.iterrows():
                                     rad_value = row[radius_value]
@@ -3121,8 +3147,10 @@ def make_map(in_df):       #bring in pandas dataframe
                         radius_default = i
                         break
                 radii = st.selectbox(t("lbl_radius_col_meters"), options=numeric_radius_cols, index=radius_default)
-                # Ensure numeric values in gdf
-                gdf[radii] = pandas.to_numeric(gdf[radii], errors='coerce').fillna(0)
+                gdf = filter_map_radius(gdf, radii, key="sector_max_radius")
+                if gdf.empty:
+                    return
+                Map.zoom_to_gdf(gdf)
 
             # Azimuth and Beam Width dropdowns with auto-detected defaults
             Azimuth = st.selectbox(t("lbl_sector_azimuth"), options=all_columns, index=azimuth_default)
@@ -3464,6 +3492,9 @@ def create_kml(df_in, outfile):
         radii = None
         if footprint:
             radii = st.selectbox(t("lbl_radius_distance"), options=headers)
+            df_in = filter_map_radius(df_in, radii, key="kml_max_radius")
+            if df_in.empty:
+                return
 
         # --- Path line option ---
         add_path_line = st.checkbox(t("chk_path_line"), value=False,
