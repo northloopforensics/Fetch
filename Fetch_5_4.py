@@ -836,7 +836,7 @@ def filter_valid_coordinates(df: pandas.DataFrame, lat_col: str = 'LATITUDE', lo
 def filter_map_radius(df: pandas.DataFrame, radius_col: str, key: str):
     """Select a maximum radius and return eligible records without changing the input."""
     max_radius = st.number_input(
-        "Maximum Radius (meters)", min_value=0.0, value=100.0, step=1.0, key=key,
+        "Maximum Radius (meters)", min_value=0.0, value=50.0, step=1.0, key=key,
         help="Filters out entire records whose radius value is larger than this maximum (in meters), including their map markers and radius shapes. Missing, non-numeric, and non-positive radii are also excluded."
     )
     radius = pandas.to_numeric(df[radius_col], errors='coerce')
@@ -849,6 +849,29 @@ def filter_map_radius(df: pandas.DataFrame, radius_col: str, key: str):
     if filtered.empty:
         st.warning("No records match the maximum radius. Increase the limit or select another radius column.")
     return filtered
+
+
+def optional_radius_filter(df: pandas.DataFrame, key: str):
+    """Optionally filter input records by their accuracy/radius column."""
+    if not st.checkbox(t("chk_accuracy_radius"), key=f"{key}_enabled"):
+        return df
+    numeric_columns = [
+        col for col in df.columns
+        if col not in ['LATITUDE', 'LONGITUDE', 'geometry']
+        and pandas.to_numeric(df[col], errors='coerce').notna().any()
+    ]
+    if not numeric_columns:
+        st.error("No numeric columns found for radius/accuracy information. Please ensure your data contains numeric columns for radius values.")
+        return df.iloc[0:0].copy()
+    default_index = next(
+        (index for index, col in enumerate(numeric_columns)
+         if any(word in str(col).upper() for word in ['RADIUS', 'ACCURACY', 'RANGE', 'DISTANCE', 'RADII'])),
+        0
+    )
+    radius_col = st.selectbox(
+        t("lbl_radius_meters"), options=numeric_columns, index=default_index, key=f"{key}_column"
+    )
+    return filter_map_radius(df, radius_col, key=f"{key}_maximum")
 
 
 def detect_and_set_header_from_rows(df: pandas.DataFrame, max_search_rows: int = 15) -> pandas.DataFrame:
@@ -2453,6 +2476,11 @@ def make_map(in_df):       #bring in pandas dataframe
     _mt_tr = [t("map_clustered"), t("map_points_trails"), t("map_hotspots"), t("map_heatmap"), t("map_cell_sites")]
     _mt_sel = st.radio(t("lbl_select_map_type"), options=_mt_tr, horizontal=True)
     map_Type = _mt_en[_mt_tr.index(_mt_sel)]
+    if map_Type not in ["Points & Trails", "Cell Sites", "Heatmap"]:
+        gdf = optional_radius_filter(gdf, key="map_radius")
+        if gdf.empty:
+            return
+        valid_records = gdf
     Map = leafmap.Map()
     # Defer zooming for Hotspots so we can compute a tighter fit later
     if map_Type != "Hotspots":
@@ -2727,6 +2755,12 @@ def make_map(in_df):       #bring in pandas dataframe
             _pp_tr = [t("mode_markers"), t("mode_progression"), t("mode_vapor")]
             _pp_sel = st.radio(label=t("lbl_select_map_activity"), options=_pp_tr, horizontal=True)
             points_or_path = _pp_en[_pp_tr.index(_pp_sel)]
+            if points_or_path != "Markers":
+                gdf = optional_radius_filter(gdf, key="trail_radius")
+                if gdf.empty:
+                    return
+                valid_records = gdf
+                Map.zoom_to_gdf(gdf)
             
             if points_or_path == "Markers":     #Shows markers only
                 if "POINT_COLOR" in valid_records.columns:
@@ -4808,6 +4842,15 @@ if preview_data is not None:
         st.header(t("hdr_advanced_analysis"))
         _adv_opts = [t("tab_stop_dwell"), t("tab_colocation")]
         _adv_sel = nav_selector("Analysis", _adv_opts, key="nav_adv")
+        analysis_data = optional_radius_filter(preview_data, key="analysis_radius")
+        analysis_input = (
+            tuple(analysis_data.columns),
+            int(pandas.util.hash_pandas_object(analysis_data, index=True).sum())
+        )
+        if safe_session_get('analysis_radius_input') != analysis_input:
+            safe_session_set('stop_results', None)
+            safe_session_set('coloc_results', None)
+            safe_session_set('analysis_radius_input', analysis_input)
 
         if _adv_sel == _adv_opts[0]:
             # --- Stop / Dwell Detection (Feature #7) ---
@@ -4831,15 +4874,15 @@ if preview_data is not None:
 
                 # Per-source or combined
                 run_stops_per_source = False
-                if 'SOURCE_FILE' in preview_data.columns and preview_data['SOURCE_FILE'].nunique() > 1:
+                if 'SOURCE_FILE' in analysis_data.columns and analysis_data['SOURCE_FILE'].nunique() > 1:
                     run_stops_per_source = st.checkbox(t("chk_per_source"), value=True, key="stop_per_src")
 
-                if st.button(t("btn_detect_stops"), key="run_stops"):
+                if st.button(t("btn_detect_stops"), key="run_stops", disabled=analysis_data.empty):
                     with st.spinner("Analyzing stops..."):
                         all_stops = []
                         if run_stops_per_source:
-                            for src in preview_data['SOURCE_FILE'].unique():
-                                src_df = preview_data[preview_data['SOURCE_FILE'] == src]
+                            for src in analysis_data['SOURCE_FILE'].unique():
+                                src_df = analysis_data[analysis_data['SOURCE_FILE'] == src]
                                 stops_df = cached_compute_stops(src_df, stop_time_col, stop_radius, stop_min_duration, src)
                                 if not stops_df.empty:
                                     all_stops.append(stops_df)
@@ -4848,12 +4891,11 @@ if preview_data is not None:
                             else:
                                 stops_result = pandas.DataFrame()
                         else:
-                            stops_result = cached_compute_stops(preview_data, stop_time_col, stop_radius, stop_min_duration)
+                            stops_result = cached_compute_stops(analysis_data, stop_time_col, stop_radius, stop_min_duration)
 
+                        safe_session_set('stop_results', stops_result)
                         if stops_result.empty:
                             st.warning("No stops detected with current parameters. Try increasing the radius or decreasing the minimum duration.")
-                        else:
-                            safe_session_set('stop_results', stops_result)
 
                 # Display results
                 stops_result = safe_session_get('stop_results')
@@ -4926,10 +4968,10 @@ if preview_data is not None:
             st.subheader(t("hdr_colocation"))
             st.caption("Detect when and where two subjects (from different source files) were at the same place at the same time.")
 
-            if 'SOURCE_FILE' not in preview_data.columns or preview_data['SOURCE_FILE'].nunique() < 2:
+            if 'SOURCE_FILE' not in analysis_data.columns or analysis_data['SOURCE_FILE'].nunique() < 2:
                 st.info("Co-location analysis requires **2 or more source files** loaded simultaneously. Upload multiple files to use this feature.")
             else:
-                sources = sorted(preview_data['SOURCE_FILE'].unique())
+                sources = sorted(analysis_data['SOURCE_FILE'].unique())
                 st.write(f"**{len(sources)} source files loaded:** {', '.join(sources)}")
 
                 coloc_time_cols = [c for c in preview_data.columns if 'TIME' in c.upper() or 'DATE' in c.upper()]
@@ -4946,9 +4988,9 @@ if preview_data is not None:
                         coloc_time_window = st.number_input(t("lbl_time_window"), min_value=1, max_value=1440, value=10, step=1, key="coloc_window",
                                                             help="Maximum time difference between observations")
 
-                    if st.button(t("btn_run_colocation"), key="run_coloc"):
+                    if st.button(t("btn_run_colocation"), key="run_coloc", disabled=analysis_data.empty):
                         with st.spinner("Analyzing co-location events... This may take a moment for large datasets."):
-                            coloc_result = cached_compute_colocation(preview_data, coloc_time_col, coloc_radius, coloc_time_window)
+                            coloc_result = cached_compute_colocation(analysis_data, coloc_time_col, coloc_radius, coloc_time_window)
                             safe_session_set('coloc_results', coloc_result)
 
                     coloc_result = safe_session_get('coloc_results')
