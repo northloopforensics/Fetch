@@ -1903,10 +1903,9 @@ def make_geofence_map():
         safe_session_set('cached_search_term', None)
 
     # Initialize with neutral continental US view; we'll optionally recenter below
-    geomap = folium.Map(zoom_start=4, location=[39,-98])
+    geomap = folium.Map(zoom_start=4, location=[39,-98], tiles=None)
+    add_map_basemaps(geomap)
     Draw(export=True, draw_options={'circle': False,'circlemarker':False, 'marker':False}).add_to(geomap)
-    folium.TileLayer(tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-                     attr='Esri', name='Esri Satellite', overlay=False, control=True).add_to(geomap)
     folium.LayerControl(position="topright", collapsed=True).add_to(geomap)
 
     # Geocode/IP locate - Only run when search button is clicked
@@ -2012,10 +2011,9 @@ def make_geofence_map():
                 st.json(all_attrs)
             
             # Rebuild map centered on result
-            geomap = folium.Map(location=ip_res.latlng, zoom_start=11)
+            geomap = folium.Map(location=ip_res.latlng, zoom_start=11, tiles=None)
+            add_map_basemaps(geomap)
             Draw(export=True, draw_options={'circle': False,'circlemarker':False, 'marker':False}).add_to(geomap)
-            folium.TileLayer(tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-                             attr='Esri', name='Esri Satellite', overlay=False, control=True).add_to(geomap)
             folium.LayerControl(position="topright", collapsed=True).add_to(geomap)
             
             # Create enhanced popup with correct field names
@@ -2093,10 +2091,9 @@ def make_geofence_map():
                             pass
                 st.json(all_attrs)
             
-            geomap = folium.Map(location=geo_res.latlng, zoom_start=16)
+            geomap = folium.Map(location=geo_res.latlng, zoom_start=16, tiles=None)
+            add_map_basemaps(geomap)
             Draw(export=True, draw_options={'circle': False,'circlemarker':False, 'marker':False}).add_to(geomap)
-            folium.TileLayer(tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-                             attr='Esri', name='Esri Satellite', overlay=False, control=True).add_to(geomap)
             folium.LayerControl(position="topright", collapsed=True).add_to(geomap)
             
             # Create enhanced popup for address
