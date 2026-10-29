@@ -14,6 +14,14 @@ import tempfile
 # leafmap writes temp HTML files relative to cwd; ensure cwd is always writable
 os.chdir(tempfile.gettempdir())
 
+# Leafmap selects Google basemaps when this key is available at import time.
+try:
+    google_maps_api_key = os.getenv("GOOGLE_MAPS_API_KEY") or st.secrets.get("GOOGLE_MAPS_API_KEY")
+except FileNotFoundError:
+    google_maps_api_key = os.getenv("GOOGLE_MAPS_API_KEY")
+if google_maps_api_key:
+    os.environ["GOOGLE_MAPS_API_KEY"] = str(google_maps_api_key)
+
 # ── Language Support ───────────────────────────────────────────────────────────
 TRANSLATIONS = {
     "en": {
