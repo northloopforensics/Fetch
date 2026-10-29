@@ -979,8 +979,18 @@ def add_map_basemaps(map_obj):
     map_obj.add_basemap(basemap='OpenStreetMap')
     map_obj.add_basemap(basemap='ROADMAP', show=False)
     map_obj.add_basemap(basemap='TERRAIN', show=False)
-    map_obj.add_basemap(basemap='HYBRID', show=False)
+    if google_maps_api_key:
+        map_obj.add_basemap(basemap='HYBRID', show=False)
     map_obj.add_basemap(basemap='Esri.WorldImagery', show=False)
+    # Without overlay=False the group would appear as a toggleable overlay, not a base layer.
+    hybrid = folium.FeatureGroup(name="Satellite + Labels (Esri)", overlay=False, show=False)
+    esri_attr = "Esri, Maxar, Earthstar Geographics, and the GIS User Community"
+    for service in ("World_Imagery", "Reference/World_Transportation", "Reference/World_Boundaries_and_Places"):
+        folium.TileLayer(
+            tiles=f"https://server.arcgisonline.com/ArcGIS/rest/services/{service}/MapServer/tile/{{z}}/{{y}}/{{x}}",
+            attr=esri_attr, max_zoom=19, overlay=True, control=False,
+        ).add_to(hybrid)
+    hybrid.add_to(map_obj)
     map_obj.add_basemap(basemap='Esri.WorldGrayCanvas', show=False)
     map_obj.add_basemap(basemap='Esri.WorldTerrain', show=False)
 
