@@ -767,7 +767,6 @@ import folium                           #   maps
 from math import asin, atan2, cos, degrees, radians, sin    #   calculates shapes and polygons on sphere
 from folium.plugins import Draw, Geocoder, TimestampedGeoJson, HeatMap      
 from streamlit_folium import st_folium          #   used to create geofences
-import streamlit.components.v1 as components
 import datetime
 import io
 import geocoder                         #   search bar for geofence, api calls for address and ip lookups
@@ -962,11 +961,20 @@ def render_leafmap(m, height: int = 600, download_name: Optional[str] = None, do
         html = m.to_html()
     except Exception:
         html = m.get_root().render()
-    components.html(html, height=height)
+    st.iframe(html, height=height)
     safe_session_set('last_map_type', 'leaflet')
     if download_name:
         st.download_button(label="Download Map HTML", data=fix_osm_tiles_for_export(html),
                            file_name=download_name, key=download_key)
+
+def add_map_basemaps(map_obj):
+    map_obj.add_basemap(basemap='OpenStreetMap')
+    map_obj.add_basemap(basemap='ROADMAP', show=False)
+    map_obj.add_basemap(basemap='TERRAIN', show=False)
+    map_obj.add_basemap(basemap='HYBRID', show=False)
+    map_obj.add_basemap(basemap='Esri.WorldImagery', show=False)
+    map_obj.add_basemap(basemap='Esri.WorldGrayCanvas', show=False)
+    map_obj.add_basemap(basemap='Esri.WorldTerrain', show=False)
 
 # Fragments rerun only the decorated function on widget interaction instead of the whole script.
 _fragment = getattr(st, "fragment", None) or getattr(st, "experimental_fragment", None) or (lambda f: f)
@@ -1743,7 +1751,7 @@ def render_tactical_clock(points_df: pandas.DataFrame, time_col: str, title: str
     ]
     st.plotly_chart(
         fig,
-        use_container_width=True,
+        width="stretch",
         config={
             'displaylogo': False,
             'modeBarButtonsToRemove': remove_buttons,
@@ -2161,8 +2169,7 @@ def make_geofence_map():
             # that st_folium exposes, so we attempt to preserve the last drawn geometry
             # from session_state instead of relying on the component.
             html = geomap._repr_html_()
-            import streamlit.components.v1 as components
-            components.html(html, height=600, scrolling=True)
+            st.iframe(html, height=600, scrolling=True)
         except Exception:
             # If even HTML rendering fails, show a placeholder message.
             try:
@@ -2435,13 +2442,7 @@ def make_IPaddress_Map():   #used to map ips
         except UnboundLocalError:
             pass
         ipmap = leafmap.Map(zoom=2)    
-        ipmap.add_basemap(basemap='OpenStreetMap')                       # free default
-        ipmap.add_basemap(basemap='ROADMAP', show=False)
-        ipmap.add_basemap(basemap='TERRAIN', show=False)
-        ipmap.add_basemap(basemap='HYBRID', show=False)
-        ipmap.add_basemap(basemap='Esri.WorldImagery', show=False)       # free satellite
-        ipmap.add_basemap(basemap='CartoDB.Positron', show=False)        # free light
-        ipmap.add_basemap(basemap='CartoDB.DarkMatter', show=False)      # free dark
+        add_map_basemaps(ipmap)
         # ipmap.zoom_to_gdf(gdf) 
         try:
             user_spot = ipmap.add_circle_markers_from_xy(data=user_gdf, x="lng", y="lat",color='Red',fill_color="White")
@@ -2485,13 +2486,7 @@ def make_map(in_df):       #bring in pandas dataframe
     # Defer zooming for Hotspots so we can compute a tighter fit later
     if map_Type != "Hotspots":
         Map.zoom_to_gdf(gdf) 
-    Map.add_basemap(basemap='OpenStreetMap')                       # free default
-    Map.add_basemap(basemap='ROADMAP', show=False)
-    Map.add_basemap(basemap='TERRAIN', show=False)
-    Map.add_basemap(basemap='HYBRID', show=False)
-    Map.add_basemap(basemap='Esri.WorldImagery', show=False)       # free satellite
-    Map.add_basemap(basemap='CartoDB.Positron', show=False)        # free light
-    Map.add_basemap(basemap='CartoDB.DarkMatter', show=False)      # free dark
+    add_map_basemaps(Map)
 
     if map_Type == "Clustered Markers":
         grouped_Points = Map.add_points_from_xy(gdf, x="LONGITUDE", y="LATITUDE", min_width=10,max_width=250,layer_name="Clustered Points", add_legend=False)
@@ -3783,7 +3778,7 @@ def multi_source_time_filter_config(df):
             # Show sample data
             st.write("Sample data:")
             display_cols = [col for col in source_data.columns if col not in ['POINT_COLOR']][:6]
-            st.dataframe(source_data[display_cols].head(2), use_container_width=True)
+            st.dataframe(source_data[display_cols].head(2), width="stretch")
         
         with col2:
             # Show detected datetime candidates
@@ -3857,7 +3852,7 @@ def display_filter_results(filtered_df, original_df):
         st.subheader(t("hdr_sample_filtered"))
         # Show first 10 rows with better formatting
         sample_df = filtered_df.head(10)
-        st.dataframe(sample_df, use_container_width=True)
+        st.dataframe(sample_df, width="stretch")
         
         if len(filtered_df) > 10:
             st.info(f"ℹShowing first 10 of {len(filtered_df):,} records")
@@ -4274,7 +4269,7 @@ def ingest_multiple_files():
                 photo_df = ingest_photos(uploaded_photos)
                 if photo_df is not None and not photo_df.empty:
                     st.success(f"Extracted GPS data from {len(photo_df)} photo(s)")
-                    st.dataframe(photo_df.head(10), use_container_width=True)
+                    st.dataframe(photo_df.head(10), width="stretch")
                     photo_color = st.color_picker("Photo point color", value="#00FF00", key="photo_color_picker")
                     photo_df['SOURCE_FILE'] = 'EXIF_Photos'
                     photo_df['POINT_COLOR'] = photo_color
@@ -4439,7 +4434,7 @@ if preview_data is not None:
                 display_data = preview_data.iloc[lines_t0_remove:] if lines_t0_remove > 0 else preview_data
                 
                 # Show first few rows
-                st.dataframe(display_data.head(10), use_container_width=True)
+                st.dataframe(display_data.head(10), width="stretch")
                 
                 if len(display_data) > 10:
                     st.info(f"ℹShowing first 10 rows of {len(display_data):,} total records")
@@ -4460,7 +4455,7 @@ if preview_data is not None:
                         })
                     
                     col_df = pandas.DataFrame(col_info)
-                    st.dataframe(col_df, use_container_width=True)
+                    st.dataframe(col_df, width="stretch")
             else:
                 st.warning("⚠️ No data available to preview")
                 
@@ -4680,7 +4675,7 @@ if preview_data is not None:
                                     })
                             
                             preview_df = pandas.DataFrame(preview_results)
-                            st.dataframe(preview_df, use_container_width=True)
+                            st.dataframe(preview_df, width="stretch")
                         else:
                             st.warning("No valid datetime values found in selected column")
                             
@@ -4915,20 +4910,14 @@ if preview_data is not None:
                         else:
                             st.metric("Total Dwell Time", f"{total_dwell:.1f} min")
 
-                    st.dataframe(stops_result, use_container_width=True)
+                    st.dataframe(stops_result, width="stretch")
                     st.download_button("Download Stops CSV", data=stops_result.to_csv(index=False),
                                        file_name="Fetch_Stops.csv", key="dl_stops")
 
                     # Map the stops
                     st.markdown("### Stop Locations Map")
                     stop_map = leafmap.Map()
-                    stop_map.add_basemap(basemap='OpenStreetMap')                       # free default
-                    stop_map.add_basemap(basemap='ROADMAP', show=False)
-                    stop_map.add_basemap(basemap='TERRAIN', show=False)
-                    stop_map.add_basemap(basemap='HYBRID', show=False)
-                    stop_map.add_basemap(basemap='Esri.WorldImagery', show=False)       # free satellite
-                    stop_map.add_basemap(basemap='CartoDB.Positron', show=False)        # free light
-                    stop_map.add_basemap(basemap='CartoDB.DarkMatter', show=False)      # free dark
+                    add_map_basemaps(stop_map)
 
                     stop_palette = ["red","blue","green","orange","purple","teal","pink","yellow"]
                     for idx, row in stops_result.iterrows():
@@ -5013,20 +5002,14 @@ if preview_data is not None:
                             for _, pair_row in pairs.iterrows():
                                 st.write(f"- {pair_row['SOURCE_A']} ↔ {pair_row['SOURCE_B']}: **{pair_row['count']}** events")
 
-                        st.dataframe(coloc_result, use_container_width=True)
+                        st.dataframe(coloc_result, width="stretch")
                         st.download_button("Download Co-Location CSV", data=coloc_result.to_csv(index=False),
                                            file_name="Fetch_CoLocation.csv", key="dl_coloc")
 
                         # Map co-location events
                         st.markdown("### Co-Location Map")
                         coloc_map = leafmap.Map()
-                        coloc_map.add_basemap(basemap='OpenStreetMap')                       # free default
-                        coloc_map.add_basemap(basemap='ROADMAP', show=False)
-                        coloc_map.add_basemap(basemap='TERRAIN', show=False)
-                        coloc_map.add_basemap(basemap='HYBRID', show=False)
-                        coloc_map.add_basemap(basemap='Esri.WorldImagery', show=False)       # free satellite
-                        coloc_map.add_basemap(basemap='CartoDB.Positron', show=False)        # free light
-                        coloc_map.add_basemap(basemap='CartoDB.DarkMatter', show=False)      # free dark
+                        add_map_basemaps(coloc_map)
 
                         coloc_map_df = coloc_result
                         if len(coloc_result) > MAX_RENDER_POINTS:
