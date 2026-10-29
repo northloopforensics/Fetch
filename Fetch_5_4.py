@@ -981,16 +981,18 @@ def add_map_basemaps(map_obj):
     map_obj.add_basemap(basemap='TERRAIN', show=False)
     if google_maps_api_key:
         map_obj.add_basemap(basemap='HYBRID', show=False)
-    map_obj.add_basemap(basemap='Esri.WorldImagery', show=False)
-    # Without overlay=False the group would appear as a toggleable overlay, not a base layer.
-    hybrid = folium.FeatureGroup(name="Satellite + Labels (Esri)", overlay=False, show=True)
     esri_attr = "Esri, Maxar, Earthstar Geographics, and the GIS User Community"
-    for service in ("World_Imagery", "Reference/World_Transportation", "Reference/World_Boundaries_and_Places"):
+    folium.TileLayer(
+        tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        name="Satellite + Labels (Esri)", attr=esri_attr, max_zoom=19,
+        overlay=False, control=True, show=True,
+    ).add_to(map_obj)
+    for service in ("Reference/World_Transportation", "Reference/World_Boundaries_and_Places"):
         folium.TileLayer(
             tiles=f"https://server.arcgisonline.com/ArcGIS/rest/services/{service}/MapServer/tile/{{z}}/{{y}}/{{x}}",
-            attr=esri_attr, max_zoom=19, overlay=True, control=False,
-        ).add_to(hybrid)
-    hybrid.add_to(map_obj)
+            name=f"Esri {service.rsplit('/', 1)[-1].replace('_', ' ')}",
+            attr=esri_attr, max_zoom=19, overlay=True, control=True, show=True,
+        ).add_to(map_obj)
     map_obj.add_basemap(basemap='Esri.WorldGrayCanvas', show=False)
     map_obj.add_basemap(basemap='Esri.WorldTerrain', show=False)
 
@@ -2459,7 +2461,7 @@ def make_IPaddress_Map():   #used to map ips
             user_gdf = geopandas.GeoDataFrame(user_gdf, geometry=geopandas.points_from_xy(user_gdf.lng, user_gdf.lat))
         except UnboundLocalError:
             pass
-        ipmap = leafmap.Map(zoom=2)    
+        ipmap = leafmap.Map(zoom=2, tiles=None)
         add_map_basemaps(ipmap)
         # ipmap.zoom_to_gdf(gdf) 
         try:
@@ -2500,7 +2502,7 @@ def make_map(in_df):       #bring in pandas dataframe
         if gdf.empty:
             return
         valid_records = gdf
-    Map = leafmap.Map()
+    Map = leafmap.Map(tiles=None)
     # Defer zooming for Hotspots so we can compute a tighter fit later
     if map_Type != "Hotspots":
         Map.zoom_to_gdf(gdf) 
@@ -4934,7 +4936,7 @@ if preview_data is not None:
 
                     # Map the stops
                     st.markdown("### Stop Locations Map")
-                    stop_map = leafmap.Map()
+                    stop_map = leafmap.Map(tiles=None)
                     add_map_basemaps(stop_map)
 
                     stop_palette = ["red","blue","green","orange","purple","teal","pink","yellow"]
@@ -5026,7 +5028,7 @@ if preview_data is not None:
 
                         # Map co-location events
                         st.markdown("### Co-Location Map")
-                        coloc_map = leafmap.Map()
+                        coloc_map = leafmap.Map(tiles=None)
                         add_map_basemaps(coloc_map)
 
                         coloc_map_df = coloc_result
