@@ -2521,7 +2521,8 @@ def make_map(in_df):       #bring in pandas dataframe
 
     if map_Type == "Hotspots":
         st.markdown("---")
-        clean_coords = valid_records.copy()
+        # Hotspots use coordinates, not geometry; keep the input hashable by Streamlit.
+        clean_coords = pandas.DataFrame(valid_records.drop(columns=gdf.geometry.name))
         colh1, colh2, colh3, colh4 = st.columns(4)
         with colh1:
             radius_m = st.number_input(t("lbl_radius_m"), min_value=5, max_value=1000, value=30, step=5)
