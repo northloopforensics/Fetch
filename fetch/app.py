@@ -93,8 +93,8 @@ def main():
 
     if data is not None:
         pages = [
-            st.Page(preview_kml, title=t("tab_preview_kml"), url_path="preview", default=True),
-            st.Page(analysis_maps, title=t("tab_analysis_maps"), url_path="analysis-maps"),
+            st.Page(preview_kml, title=t("tab_preview_kml"), url_path="preview"),
+            st.Page(analysis_maps, title=t("tab_analysis_maps"), url_path="analysis-maps", default=True),
             st.Page(create_geofence, title=t("tab_create_geofence"), url_path="geofence"),
             st.Page(advanced_analysis, title=t("tab_advanced_analysis"), url_path="advanced-analysis"),
             st.Page(ip_mapping, title=t("tab_ip_mapping"), url_path="ip-mapping"),
@@ -105,6 +105,11 @@ def main():
             st.Page(ip_mapping, title=t("tab_ip_mapping"), url_path="ip-mapping"),
         ]
     page = st.navigation(pages, position="top")
+    has_data = data is not None
+    data_just_loaded = has_data and not st.session_state.get("_fetch_navigation_has_data", False)
+    st.session_state["_fetch_navigation_has_data"] = has_data
+    if data_just_loaded:
+        st.switch_page(pages[1])
     if filters_active:
         st.markdown(":orange[Filters are active]")
     page.run()
