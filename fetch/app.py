@@ -6,7 +6,7 @@ from fetch.data_manager import manage_ingested_data
 from fetch.i18n import t
 from fetch.ingest import LARGE_DATASET_ROWS, ingest_multiple_files
 
-APP_VERSION = "5.4"
+APP_VERSION = "6.0"
 LANGUAGES = {"English": "en", "Español": "es", "Português": "pt", "Deutsch": "de", "Русский": "ru"}
 
 PAGE_STYLE = """
@@ -59,6 +59,7 @@ def main():
         menu_items={}
     )
     _header()
+    navigation = st.container()
 
     data, fp = ingest_multiple_files()
     filters_active = False
@@ -92,27 +93,35 @@ def main():
         make_IPaddress_Map()
 
     if data is not None:
-        pages = [
-            st.Page(preview_kml, title=t("tab_preview_kml"), url_path="preview"),
-            st.Page(analysis_maps, title=t("tab_analysis_maps"), url_path="analysis-maps", default=True),
-            st.Page(create_geofence, title=t("tab_create_geofence"), url_path="geofence"),
-            st.Page(advanced_analysis, title=t("tab_advanced_analysis"), url_path="advanced-analysis"),
-            st.Page(ip_mapping, title=t("tab_ip_mapping"), url_path="ip-mapping"),
-        ]
+        views = {
+            "analysis-maps": (t("tab_analysis_maps"), analysis_maps),
+            "preview": (t("tab_preview_kml"), preview_kml),
+            "geofence": (t("tab_create_geofence"), create_geofence),
+            "advanced-analysis": (t("tab_advanced_analysis"), advanced_analysis),
+            "ip-mapping": (t("tab_ip_mapping"), ip_mapping),
+        }
     else:
-        pages = [
-            st.Page(create_geofence, title=t("tab_geofence"), url_path="geofence", default=True),
-            st.Page(ip_mapping, title=t("tab_ip_mapping"), url_path="ip-mapping"),
-        ]
-    page = st.navigation(pages, position="top")
+        views = {
+            "geofence": (t("tab_geofence"), create_geofence),
+            "ip-mapping": (t("tab_ip_mapping"), ip_mapping),
+        }
     has_data = data is not None
     data_just_loaded = has_data and not st.session_state.get("_fetch_navigation_has_data", False)
     st.session_state["_fetch_navigation_has_data"] = has_data
     if data_just_loaded:
-        st.switch_page(pages[1])
+        st.session_state["_fetch_view"] = "analysis-maps"
+    elif st.session_state.get("_fetch_view") not in views:
+        st.session_state["_fetch_view"] = next(iter(views))
+    # Keep shared upload and management widgets in one script context; page redirects
+    # can discard their values during the upload-triggered rerun.
+    with navigation:
+        view = st.radio(
+            "View", options=list(views), format_func=lambda name: views[name][0],
+            key="_fetch_view", horizontal=True,
+        )
     if filters_active:
         st.markdown(":orange[Filters are active]")
-    page.run()
+    views[view][1]()
 
     st.markdown("---")
     with st.expander("Privacy Statement and API Use"):
